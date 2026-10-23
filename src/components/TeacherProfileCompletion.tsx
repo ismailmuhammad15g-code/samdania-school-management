@@ -68,15 +68,18 @@ export default function TeacherProfileCompletion({ account, onComplete, onLater 
   };
 
   const handleComplete = async () => {
-    if (!profPhoto && !profPhotoLink.trim()) {
-      setError('Please choose a photo or enter an image link.');
-      return;
-    }
     setUploading(true);
     setError('');
     try {
-      const url = profPhotoLink.trim() || (profFile ? await uploadStudentPhoto(profFile) : await resizeToDataUrl(profPhoto!));
-      onComplete(account.id, { photoUrl: url, role: profRole, designation: profRole });
+      const patch: Partial<TeacherAccount> = { role: profRole, designation: profRole };
+      if (profPhotoLink.trim()) {
+        patch.photoUrl = profPhotoLink.trim();
+      } else if (profFile) {
+        patch.photoUrl = await uploadStudentPhoto(profFile);
+      } else if (profPhoto) {
+        patch.photoUrl = await resizeToDataUrl(profPhoto);
+      }
+      onComplete(account.id, patch);
     } catch (err: any) {
       setError(err && err.message ? err.message : 'Photo could not be processed. Please retake and try again.');
       setUploading(false);
@@ -100,13 +103,13 @@ export default function TeacherProfileCompletion({ account, onComplete, onLater 
 
         <div className="p-5 space-y-4">
           <p className="text-[11px] text-stone-500 leading-relaxed">
-            Please attach a clear selfie (taken with your camera) and select your role so your profile is complete.
-            আপনার একটি স্পষ্ট সেলফি (ক্যামেরা দিয়ে তোলা) এবং ভূমিকা নির্বাচন করুন।
+            Add a selfie or image link if you want, then select your role to complete your profile.
+            ছবি যোগ করা ঐচ্ছিক; প্রোফাইল সম্পূর্ণ করতে শুধু আপনার ভূমিকা নির্বাচন করুন।
           </p>
 
           {/* Camera-only selfie capture */}
           <div>
-            <label className="block text-[10px] font-bold text-stone-500 mb-1">Selfie Photo (সেলফি ছবি)</label>
+            <label className="block text-[10px] font-bold text-stone-500 mb-1">Selfie Photo (সেলফি ছবি) — Optional (ঐচ্ছিক)</label>
             <div className="flex items-center gap-3">
               <div className="w-16 h-16 rounded-full bg-stone-100 border border-stone-200 overflow-hidden flex items-center justify-center shrink-0">
                 {profPhoto ? (
@@ -128,7 +131,7 @@ export default function TeacherProfileCompletion({ account, onComplete, onLater 
               </label>
             </div>
             <input aria-label="Teacher profile image link" type="url" value={profPhotoLink} onChange={(e) => setProfPhotoLink(e.target.value)} className="mt-2 w-full bg-stone-50 border border-stone-200 rounded-lg text-xs px-3 py-2" />
-            <p className="text-[10px] text-stone-400 mt-1">Camera only — gallery/device picker is disabled.</p>
+            <p className="text-[10px] text-stone-400 mt-1">Camera or image link — optional (ঐচ্ছিক).</p>
           </div>
 
           {/* Role */}

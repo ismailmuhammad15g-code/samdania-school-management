@@ -72,16 +72,48 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
     ? Math.max(0, Math.round((parseYMD(myLeave.endDate).getTime() - today.getTime()) / 86400000) + 1)
     : 0;
 
-  // Salary received / remaining for the CURRENT month (real data from disbursements)
+  // Keep the current-month figures for the progress display, but calculate
+  // Remaining from the first due month through the current month. A recorded
+  // historical payment is also a valid due-month anchor for older accounts.
   const currentMonth = MONTHS[new Date().getMonth()];
   const currentYear = new Date().getFullYear();
+  const currentMonthIndex = new Date().getMonth();
   const receivedThisMonth = staffRecord
     ? salaryPayments
         .filter((p) => p.teacherStaffId === staffRecord.id && p.month === currentMonth && p.year === currentYear)
         .reduce((sum, p) => sum + p.netPaid, 0)
     : 0;
+  const accountStart = account?.createdAt ? new Date(account.createdAt) : today;
+  const validAccountStart = Number.isNaN(accountStart.getTime()) ? today : accountStart;
+  const startYear = validAccountStart.getFullYear();
+  const startMonthIndex = validAccountStart.getMonth();
+  const firstSalaryMonth = staffRecord
+    ? salaryPayments
+        .filter((p) => p.teacherStaffId === staffRecord.id && MONTHS.indexOf(p.month) >= 0)
+        .reduce(
+          (first, p) => Math.min(first, p.year * 12 + MONTHS.indexOf(p.month)),
+          startYear * 12 + startMonthIndex
+        )
+    : startYear * 12 + startMonthIndex;
+  const currentSalaryMonth = currentYear * 12 + currentMonthIndex;
+  const salaryMonthsElapsed = Math.max(1, currentSalaryMonth - firstSalaryMonth + 1);
+  const paidThroughCurrentMonth = staffRecord
+    ? salaryPayments
+        .filter((p) => {
+          if (p.teacherStaffId !== staffRecord.id) return false;
+          const paymentMonthIndex = MONTHS.indexOf(p.month);
+          if (paymentMonthIndex < 0) return false;
+          const paymentMonth = p.year * 12 + paymentMonthIndex;
+          return paymentMonth >= firstSalaryMonth && paymentMonth <= currentSalaryMonth;
+        })
+        .reduce((sum, p) => sum + p.netPaid, 0)
+    : 0;
+  const remainingAllMonths = staffRecord
+    ? Math.max(0, staffRecord.baseSalary * salaryMonthsElapsed - paidThroughCurrentMonth)
+    : 0;
   const remainingThisMonth = staffRecord ? Math.max(0, staffRecord.baseSalary - receivedThisMonth) : 0;
-  const isFullyPaid = staffRecord ? remainingThisMonth <= 0 : false;
+  const isFullyPaidThisMonth = staffRecord ? remainingThisMonth <= 0 : false;
+  const isFullyPaidAllMonths = staffRecord ? remainingAllMonths <= 0 : false;
   const paidPercent = staffRecord && staffRecord.baseSalary > 0
     ? Math.min(100, Math.round((receivedThisMonth / staffRecord.baseSalary) * 100))
     : 0;
@@ -302,11 +334,11 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
                     </p>
                     <p className="text-sm font-black text-emerald-700 font-mono mt-0.5">৳{receivedThisMonth.toLocaleString()}</p>
                   </div>
-                  <div className={`bg-white/70 rounded-lg p-2 ${isFullyPaid ? 'border border-emerald-200' : 'border border-red-200'}`}>
-                    <p className={`text-[9px] uppercase tracking-wide font-bold leading-tight ${isFullyPaid ? 'text-emerald-600' : 'text-red-500'}`}>
+                  <div className={`bg-white/70 rounded-lg p-2 ${isFullyPaidAllMonths ? 'border border-emerald-200' : 'border border-red-200'}`}>
+                    <p className={`text-[9px] uppercase tracking-wide font-bold leading-tight ${isFullyPaidAllMonths ? 'text-emerald-600' : 'text-red-500'}`}>
                       Remaining (বাকি)
                     </p>
-                    <p className={`text-sm font-black font-mono mt-0.5 ${isFullyPaid ? 'text-emerald-700' : 'text-red-600'}`}>৳{remainingThisMonth.toLocaleString()}</p>
+                    <p className={`text-sm font-black font-mono mt-0.5 ${remainingAllMonths <= 0 ? 'text-emerald-700' : 'text-red-600'}`}>৳{remainingAllMonths.toLocaleString()}</p>
                   </div>
                 </div>
                 <div>
@@ -317,10 +349,10 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
                   <div className="h-1.5 bg-emerald-100/80 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${paidPercent}%`, backgroundColor: isFullyPaid ? '#059669' : '#f59e0b' }}
+                      style={{ width: `${paidPercent}%`, backgroundColor: isFullyPaidThisMonth ? '#059669' : '#f59e0b' }}
                     />
                   </div>
-                  {isFullyPaid && (
+                  {isFullyPaidThisMonth && (
                     <p className="text-[9px] font-bold text-emerald-600 mt-1 flex items-center gap-1">
                       <BadgeCheck className="h-3 w-3" /> Fully paid for {currentMonth} {currentYear}
                     </p>

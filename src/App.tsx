@@ -1313,7 +1313,7 @@ export default function App() {
       return (
         <>
           {teacherViewEl}
-          {currentAccount && !currentAccount.photoUrl && currentAccount.status !== 'rejected' && (
+          {currentAccount && !currentAccount.role && currentAccount.status !== 'rejected' && (
             <TeacherProfileCompletion account={currentAccount} onComplete={handleUpdateTeacherAccount} />
           )}
         </>
