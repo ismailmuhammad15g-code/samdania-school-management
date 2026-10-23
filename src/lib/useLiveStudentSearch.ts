@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Student } from '../types';
 import { dbRefreshKey } from './localDb';
-import { isClassMatch, studentMatchesQuery } from './digitUtils';
+import { isClassMatch, normalizeForComparison, studentMatchesQuery } from './digitUtils';
 
 export type StudentStorageKey = 'samdani_students' | 'samdani_hifz_students';
+
+type SearchableStudent = Student & {
+  studentId?: unknown;
+  banglaName?: unknown;
+  rollNumber?: unknown;
+  phone?: unknown;
+};
 
 export interface UseLiveStudentSearchOptions {
   /** Supabase kv_store key to re-fetch on every search. */
@@ -38,9 +45,16 @@ export interface UseLiveStudentSearchResult {
 }
 
 function filterStudents(list: Student[], query: string, classFilter: string): Student[] {
-  return list.filter(
-    (s) => studentMatchesQuery(s, query) && isClassMatch(s.class, classFilter)
-  );
+  const classStudents = list.filter((student) => isClassMatch(student.class, classFilter));
+  const normalizedQuery = normalizeForComparison(query);
+  if (/^\d+$/.test(normalizedQuery)) {
+    const exactRollMatches = classStudents.filter(
+      (student) => normalizeForComparison(student.roll) === normalizedQuery
+    );
+    if (exactRollMatches.length > 0) return exactRollMatches;
+  }
+
+  return classStudents.filter((student) => studentMatchesQuery(student, query));
 }
 
 /**
@@ -91,11 +105,11 @@ export function useLiveStudentSearch({
 
     (async () => {
       setLoading(true);
-      let list: Student[] = Array.isArray(fallbackRef.current) ? fallbackRef.current : [];
+      let list: SearchableStudent[] = Array.isArray(fallbackRef.current) ? fallbackRef.current : [];
 
       try {
         const fresh = await dbRefreshKey(storageKey);
-        if (Array.isArray(fresh)) list = fresh as Student[];
+        if (Array.isArray(fresh)) list = fresh as SearchableStudent[];
       } catch {
         /* keep fallback */
       }
@@ -105,10 +119,14 @@ export function useLiveStudentSearch({
       // Normalize so search never crashes on numeric rolls / missing fields.
       const normalized = list.map((s, idx) => ({
         ...s,
-        id: s?.id != null && String(s.id).trim() !== '' ? String(s.id) : `missing-${idx}`,
-        name: s?.name != null ? String(s.name) : '',
-        roll: s?.roll != null ? String(s.roll) : '',
-        contact: s?.contact != null ? String(s.contact) : '',
+        id: s?.id != null && String(s.id).trim() !== ''
+          ? String(s.id)
+          : s?.studentId != null && String(s.studentId).trim() !== ''
+            ? String(s.studentId)
+            : `missing-${idx}`,
+        name: s?.name != null ? String(s.name) : s?.banglaName != null ? String(s.banglaName) : '',
+        roll: s?.roll != null ? String(s.roll) : s?.rollNumber != null ? String(s.rollNumber) : '',
+        contact: s?.contact != null ? String(s.contact) : s?.phone != null ? String(s.phone) : '',
         class: s?.class != null ? String(s.class) : '',
       }));
 

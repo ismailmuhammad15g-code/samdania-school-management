@@ -78,20 +78,41 @@ export function digitsOnly(input: unknown): string {
 export function studentMatchesQuery(
   student: {
     name?: unknown;
+    banglaName?: unknown;
     id?: unknown;
+    studentId?: unknown;
     roll?: unknown;
+    rollNumber?: unknown;
     contact?: unknown;
+    phone?: unknown;
+    class?: unknown;
+    fatherName?: unknown;
+    motherName?: unknown;
+    extraInfo?: unknown;
   },
   rawQuery: unknown
 ): boolean {
   const term = normalizeForComparison(rawQuery);
   if (!term) return true;
 
-  const fields = [student.name, student.id, student.roll, student.contact];
+  const fields = [
+    student.name,
+    student.banglaName,
+    student.id,
+    student.studentId,
+    student.roll,
+    student.rollNumber,
+    student.contact,
+    student.phone,
+    student.class,
+    student.fatherName,
+    student.motherName,
+    student.extraInfo,
+  ];
   if (fields.some((f) => normalizeForComparison(f).includes(term))) return true;
 
   const termDigits = term.replace(/\D+/g, '');
-  if (termDigits.length >= 2) {
+  if (termDigits.length > 0) {
     if (fields.some((f) => digitsOnly(f).includes(termDigits))) return true;
   }
 
