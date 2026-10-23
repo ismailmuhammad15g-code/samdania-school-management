@@ -164,8 +164,7 @@ export default function FeesModule({
     setShowPreview(true);
   };
 
-    // Generate printable slips
-  const generatePrintableSlips = async () => {
+    const generatePrintableSlips = async () => {
     setIsGenerating(true);
     
     // Simulate loading delay for UI polish
@@ -195,7 +194,7 @@ export default function FeesModule({
     console.log('Slips generated successfully!');
     
     // Close the input modal automatically
-    closeModal();
+    setIsModalOpen(false);
   };
 
   // Close modal and reset
@@ -1613,88 +1612,29 @@ export default function FeesModule({
 
               {/* Print Container - Hidden in normal view, shown during print */}
               <div id="print-slips-container" className="hidden print:block">
-                {(() => {
-                  const chunks: Student[][] = [];
-                  for (let i = 0; i < generatedSlips.length; i += 8) {
-                    chunks.push(generatedSlips.slice(i, i + 8));
-                  }
-                  
-                  return chunks.map((chunk, chunkIndex) => (
-                    <div key={chunkIndex} className="a4-page-wrapper">
-                      {chunk.map((student) => {
-                        const totalDue = calculateTotalDue(student);
-                        const feeBreakdown = `${student.previousDue.toLocaleString()} | ${student.currentMonthFee.toLocaleString()} | ${student.examFee.toLocaleString()} | ${student.transport.toLocaleString()} | ${student.electricity.toLocaleString()} | ${student.water.toLocaleString()} | ${student.waiver.toLocaleString()} | ${student.advancePaid.toLocaleString()}`;
-                        
-                        return (
-                          <div key={student.id} className="due-slip">
-                            <table className="due-slip-table">
-                              <tbody>
-                                <tr>
-                                  <td colSpan={2} className="font-bold text-center text-[#2c332d] border-b-2 border-black py-2 bg-[#f5f2ed]">
-                                    {student.name}
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td className="w-1/2">
-                                    <div className="space-y-1">
-                                      <div className="flex justify-between">
-                                        <span>Roll:</span>
-                                        <span className="font-mono">{student.roll}</span>
-                                      </div>
-                                      <div className="flex justify-between">
-                                        <span>Class:</span>
-                                        <span>{student.class}</span>
-                                      </div>
-                                      <div className="flex justify-between">
-                                        <span>Cont:</span>
-                                        <span className="font-mono">{student.contact || '—'}</span>
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="w-1/2">
-                                    <div className="space-y-1">
-                                      <div className="flex justify-between">
-                                        <span>ফাদার:</span>
-                                        <span className="font-mono">{student.fatherName || '—'}</span>
-                                      </div>
-                                      <div className="flex justify-between">
-                                        <span>Mother:</span>
-                                        <span className="font-mono">{student.motherName || '—'}</span>
-                                      </div>
-                                      <div className="flex justify-between">
-                                        <span>প্রযোজক:</span>
-                                        <span className="font-mono">{student.extraInfo || '—'}</span>
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td colSpan={2} className="text-xs">
-                                    <div className="space-y-0.5">
-                                      <div className="flex justify-between">
-                                        <span>আদায়ের হিসাব:</span>
-                                        <span className="font-mono text-right">৳ {student.previousDue.toLocaleString()} | ৳ {student.currentMonthFee.toLocaleString()} | ৳ {student.examFee.toLocaleString()} | ৳ {student.transport.toLocaleString()} | ৳ {student.electricity.toLocaleString()} | ৳ {student.water.toLocaleString()} | ৳ {student.waiver.toLocaleString()} | ৳ {student.advancePaid.toLocaleString()}</span>
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td colSpan={2}>
-                                    <div className="text-[10px] text-stone-600">
-                                      <div className="border-t border-dashed border-stone-300 pt-1 mt-1">
-                                        আগামি {deadlineDate || '2024-12-31'} ইং তারিখের মধ্যে আপনার বকেয়া {totalDue.toLocaleString()} টাকা পরিশোধ করুন।
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
+                {generatedSlips.length > 0 && (
+                  <div className="space-y-3">
+                    {generatedSlips.map((student) => {
+                      const totalDue = calculateTotalDue(student);
+                      return (
+                        <div key={student.id} className="flex items-center justify-between p-3 bg-[#f5f2ed]/50 rounded-lg border border-stone-200">
+                          <div className="flex-1">
+                            <p className="text-xs font-bold text-[#2c332d]">{student.name}</p>
+                            <p className="text-[10px] text-stone-500">Class: {student.class} | Roll: {student.roll}</p>
                           </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
+                          <div className="text-right">
+                            <p className="text-xs font-mono font-bold text-[#b27d6d]">৳ {totalDue.toLocaleString()}</p>
+                            <p className="text-[10px] text-stone-400">
+                              Previous: ৳ {student.previousDue.toLocaleString()} |
+                              Monthly: ৳ {student.currentMonthFee.toLocaleString()} |
+                              Exam: ৳ {student.examFee.toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}
