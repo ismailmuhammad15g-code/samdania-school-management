@@ -13,7 +13,7 @@ import {
   User,
 } from 'lucide-react';
 import StudentPickerModal from './StudentPickerModal';
-import { normalizeForComparison } from '../lib/digitUtils';
+import { convertBengaliToEnglish, normalizeForComparison } from '../lib/digitUtils';
 
 interface ResultsModuleProps {
   students: Student[];
@@ -29,6 +29,7 @@ interface CombinedSubjectRow {
   subjectName: string;
   t1?: { marks: number; full: number };
   t2?: { marks: number; full: number };
+  highestMarks?: number;
   total: number;
   full: number;
   grade: string;
@@ -73,20 +74,20 @@ export default function ResultsModule({
   // Result Entry Form State
   const [entryExamType, setEntryExamType] = useState<'First Term' | 'Second Term' | 'Annual'>('First Term');
   const [entryYear, setEntryYear] = useState(new Date().getFullYear());
-  const [subjectMarks, setSubjectMarks] = useState<{ subjectName: string; marks: string; fullMark: string }[]>([]);
+  const [subjectMarks, setSubjectMarks] = useState<{ subjectName: string; marks: string; fullMark: string; highestMarks: string }[]>([]);
   const [remarks, setRemarks] = useState('');
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   const addSubject = () => {
-    setSubjectMarks([...subjectMarks, { subjectName: '', marks: '', fullMark: '' }]);
+    setSubjectMarks([...subjectMarks, { subjectName: '', marks: '', fullMark: '', highestMarks: '' }]);
   };
 
   const removeSubject = (index: number) => {
     setSubjectMarks(subjectMarks.filter((_, i) => i !== index));
   };
 
-  const updateSubject = (index: number, field: 'subjectName' | 'marks' | 'fullMark', value: string) => {
+  const updateSubject = (index: number, field: 'subjectName' | 'marks' | 'fullMark' | 'highestMarks', value: string) => {
     const updated = [...subjectMarks];
     updated[index] = { ...updated[index], [field]: value };
     setSubjectMarks(updated);
@@ -155,7 +156,12 @@ export default function ResultsModule({
         .filter((p): p is SubjectMark => !!p);
       const marksObtained = parts.reduce((s, p) => s + p.marksObtained, 0);
       const maxMarks = parts.reduce((s, p) => s + p.maxMarks, 0);
-      return { subjectName: name, marksObtained, maxMarks };
+      return {
+        subjectName: name,
+        marksObtained,
+        maxMarks,
+        highestMarks: base.marks.find((mark) => mark.subjectName === name)?.highestMarks,
+      };
     });
     const grading = calculateGradeAndGPA(marks);
     return { ...base, marks, grade: grading.grade, gpa: grading.gpa, status: grading.status };
@@ -191,6 +197,7 @@ export default function ResultsModule({
           subjectName: name,
           t1: m1 ? { marks: m1.marksObtained, full: m1.maxMarks } : undefined,
           t2: m2 ? { marks: m2.marksObtained, full: m2.maxMarks } : undefined,
+          highestMarks: m2?.highestMarks ?? m1?.highestMarks,
           total,
           full,
           grade: gradeFromPct(pct),
@@ -234,13 +241,28 @@ export default function ResultsModule({
     }
 
     const studentObj = selectedStudent;
+    const parseScore = (value: string) => {
+      const englishDigits = convertBengaliToEnglish(value).trim();
+      return englishDigits === '' ? Number.NaN : Number(englishDigits);
+    };
+    const invalidScore = subjectMarks.some((subject) =>
+      [subject.fullMark, subject.highestMarks, subject.marks].some((value) => {
+        const parsed = parseScore(value);
+        return !Number.isFinite(parsed) || parsed < 0;
+      })
+    );
+    if (invalidScore) {
+      alert('Please enter valid non-negative numbers for all score fields.');
+      return;
+    }
 
     const marksList: SubjectMark[] = subjectMarks
       .filter((s) => s.subjectName.trim() !== '')
       .map((s) => ({
         subjectName: s.subjectName.trim(),
-        marksObtained: parseInt(s.marks) || 0,
-        maxMarks: parseInt(s.fullMark) || 100,
+        marksObtained: parseScore(s.marks),
+        maxMarks: parseScore(s.fullMark),
+        highestMarks: parseScore(s.highestMarks),
       }));
 
     if (marksList.length === 0) {
@@ -821,23 +843,23 @@ export default function ResultsModule({
                 {subjectMarks.map((sub, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-3 bg-stone-50 p-2.5 rounded-lg border border-stone-200/50"
+                    className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:gap-3 bg-stone-50 p-2.5 rounded-lg border border-stone-200/50"
                   >
                     <span className="text-[10px] font-bold text-stone-400 w-5 text-center font-mono">{index + 1}</span>
                     <input
                       type="text"
                       required
-                      placeholder="Subject name"
+                      placeholder="Subject name (বিষয়ের নাম)"
                       value={sub.subjectName}
                       onChange={(e) => updateSubject(index, 'subjectName', e.target.value)}
-                      className="flex-1 bg-white text-xs font-bold border border-stone-300 rounded px-2.5 py-1.5 focus:border-[#4a5d4e] focus:outline-none"
+                      className="min-w-[140px] flex-1 bg-white text-xs font-bold border border-stone-300 rounded px-2.5 py-1.5 focus:border-[#4a5d4e] focus:outline-none"
                     />
-                    <div className="flex items-end gap-2">
+                    <div className="ml-auto flex w-full items-end justify-end gap-2 sm:ml-0 sm:w-auto">
                       <div className="w-20">
-                        <span className="block text-[9px] font-bold text-stone-400 mb-1 text-center">Full Mark</span>
+                        <span className="block min-h-6 text-[8px] leading-tight font-bold text-stone-500 mb-1 text-center">Full Mark (পূর্ণ নম্বর)</span>
                         <input
-                          type="number"
-                          min="0"
+                          type="text"
+                          inputMode="decimal"
                           required
                           placeholder="100"
                           value={sub.fullMark}
@@ -846,10 +868,22 @@ export default function ResultsModule({
                         />
                       </div>
                       <div className="w-20">
-                        <span className="block text-[9px] font-bold text-stone-400 mb-1 text-center">Got</span>
+                        <span className="block min-h-6 text-[8px] leading-tight font-bold text-stone-500 mb-1 text-center">Highest Marks (সর্বোচ্চ নম্বর)</span>
                         <input
-                          type="number"
-                          min="0"
+                          type="text"
+                          inputMode="decimal"
+                          required
+                          placeholder="0"
+                          value={sub.highestMarks}
+                          onChange={(e) => updateSubject(index, 'highestMarks', e.target.value)}
+                          className="w-full bg-white text-xs font-bold border border-stone-300 rounded text-center py-1.5 font-mono focus:border-[#4a5d4e] focus:outline-none"
+                        />
+                      </div>
+                      <div className="w-20">
+                        <span className="block min-h-6 text-[8px] leading-tight font-bold text-stone-500 mb-1 text-center">Marks Obtained (প্রাপ্ত নম্বর)</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
                           required
                           placeholder="Marks"
                           value={sub.marks}
@@ -941,6 +975,9 @@ export default function ResultsModule({
               <div className="inline-block bg-[#4a5d4e] text-[#d9c5b2] font-serif font-bold text-xs px-4 py-1.5 mt-2 tracking-widest uppercase rounded">
                 Academic Progress Report (পরীক্ষার ফলাফল পত্র)
               </div>
+              <p className="text-sm font-black text-[#2c332d] pt-1">
+                Exam Cycle (পরীক্ষা): {r.examType} ({r.examType === 'First Term' ? 'প্রথম সাময়িক' : r.examType === 'Second Term' ? 'দ্বিতীয় সাময়িক' : 'বার্ষিক পরীক্ষা'})
+              </p>
             </div>
 
             {/* Student Metadata */}
@@ -964,10 +1001,6 @@ export default function ResultsModule({
                   <strong>Assigned Class (শ্রেণী):</strong> <span className="font-bold">{r.class}</span>
                 </p>
                 <p>
-                  <strong>Exam Cycle (পরীক্ষা):</strong>{' '}
-                  <span className="font-bold text-[#4a5d4e]">{r.examType}</span>
-                </p>
-                <p>
                   <strong>Date Compiled:</strong>{' '}
                   <span className="font-mono">{r.date || new Date().toISOString().split('T')[0]}</span>
                 </p>
@@ -979,9 +1012,10 @@ export default function ResultsModule({
               <thead>
                 <tr className="bg-[#4a5d4e] text-stone-100 font-bold">
                   <th className="py-2 px-3 border border-stone-300">Subject Name (বিষয়ের নাম)</th>
-                  <th className="py-2 px-3 text-center border border-stone-300 w-24">Full Marks</th>
-                  <th className="py-2 px-3 text-center border border-stone-300 w-24">Marks Obtained</th>
-                  <th className="py-2 px-3 text-center border border-stone-300 w-24">Grade</th>
+                  <th className="py-2 px-3 text-center border border-stone-300 w-24">Full Marks (পূর্ণ নম্বর)</th>
+                  <th className="py-2 px-3 text-center border border-stone-300 w-24">Highest Marks (সর্বোচ্চ নম্বর)</th>
+                  <th className="py-2 px-3 text-center border border-stone-300 w-24">Marks Obtained (প্রাপ্ত নম্বর)</th>
+                  <th className="py-2 px-3 text-center border border-stone-300 w-24">Grade (গ্রেড)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-200">
@@ -1003,6 +1037,9 @@ export default function ResultsModule({
                       <td className="py-2 px-3 text-center border border-stone-300 font-mono font-bold text-stone-500">
                         {m.maxMarks}
                       </td>
+                      <td className="py-2 px-3 text-center border border-stone-300 font-mono font-bold text-stone-500">
+                        {m.highestMarks ?? '—'}
+                      </td>
                       <td className="py-2 px-3 text-center border border-stone-300 font-mono font-black text-stone-900">
                         {m.marksObtained}
                       </td>
@@ -1019,6 +1056,7 @@ export default function ResultsModule({
                   <td className="py-2.5 px-3 text-center border border-stone-300 font-mono font-bold">
                     {r.marks.reduce((s, m) => s + m.maxMarks, 0)}
                   </td>
+                  <td className="py-2.5 px-3 text-center border border-stone-300 font-mono font-bold">—</td>
                   <td className="py-2.5 px-3 text-center border border-stone-300 font-mono font-black text-sm text-[#4a5d4e]">
                     {r.marks.reduce((s, m) => s + m.marksObtained, 0)}
                   </td>
@@ -1144,16 +1182,18 @@ export default function ResultsModule({
               <thead>
                 <tr className="bg-[#4a5d4e] text-stone-100 font-bold">
                   <th className="py-2 px-3 border border-stone-300">Subject (বিষয়)</th>
-                  <th className="py-2 px-3 text-center border border-stone-300 w-20">Term 1</th>
-                  <th className="py-2 px-3 text-center border border-stone-300 w-20">Term 2</th>
-                  <th className="py-2 px-3 text-center border border-stone-300 w-20">Combined</th>
-                  <th className="py-2 px-3 text-center border border-stone-300 w-16">Grade</th>
+                  <th className="py-2 px-3 text-center border border-stone-300 w-20">Highest Marks (সর্বোচ্চ নম্বর)</th>
+                  <th className="py-2 px-3 text-center border border-stone-300 w-20">Term 1 (প্রথম সাময়িক)</th>
+                  <th className="py-2 px-3 text-center border border-stone-300 w-20">Term 2 (দ্বিতীয় সাময়িক)</th>
+                  <th className="py-2 px-3 text-center border border-stone-300 w-20">Combined (সম্মিলিত)</th>
+                  <th className="py-2 px-3 text-center border border-stone-300 w-16">Grade (গ্রেড)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-200">
                 {viewingCombined.subjects.map((s) => (
                   <tr key={s.subjectName} className="hover:bg-stone-50">
                     <td className="py-2 px-3 border border-stone-300 font-semibold text-[#2c332d]">{s.subjectName}</td>
+                    <td className="py-2 px-3 text-center border border-stone-300 font-mono">{s.highestMarks ?? '—'}</td>
                     <td className="py-2 px-3 text-center border border-stone-300 font-mono">
                       {s.t1 ? `${s.t1.marks}/${s.t1.full}` : '—'}
                     </td>
@@ -1169,7 +1209,7 @@ export default function ResultsModule({
                   </tr>
                 ))}
                 <tr className="bg-[#f5f2ed]/60 font-bold text-stone-900">
-                  <td className="py-2.5 px-3 border border-stone-300 text-right" colSpan={3}>
+                  <td className="py-2.5 px-3 border border-stone-300 text-right" colSpan={4}>
                     Aggregate Combined Totals:
                   </td>
                   <td className="py-2.5 px-3 text-center border border-stone-300 font-mono font-black text-sm text-[#4a5d4e]">
@@ -1274,16 +1314,18 @@ export default function ResultsModule({
                     <thead>
                       <tr className="bg-stone-100 text-stone-700 font-bold">
                         <th className="py-1.5 px-3 border border-stone-200">Subject (বিষয়)</th>
-                        <th className="py-1.5 px-3 text-center border border-stone-200 w-24">Term 1</th>
-                        <th className="py-1.5 px-3 text-center border border-stone-200 w-24">Term 2</th>
-                        <th className="py-1.5 px-3 text-center border border-stone-200 w-24">Combined</th>
-                        <th className="py-1.5 px-3 text-center border border-stone-200 w-16">Grade</th>
+                        <th className="py-1.5 px-3 text-center border border-stone-200 w-24">Highest Marks (সর্বোচ্চ নম্বর)</th>
+                        <th className="py-1.5 px-3 text-center border border-stone-200 w-24">Term 1 (প্রথম সাময়িক)</th>
+                        <th className="py-1.5 px-3 text-center border border-stone-200 w-24">Term 2 (দ্বিতীয় সাময়িক)</th>
+                        <th className="py-1.5 px-3 text-center border border-stone-200 w-24">Combined (সম্মিলিত)</th>
+                        <th className="py-1.5 px-3 text-center border border-stone-200 w-16">Grade (গ্রেড)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
                       {c.subjects.map((s) => (
                         <tr key={s.subjectName}>
                           <td className="py-1.5 px-3 border border-stone-200 font-semibold text-[#2c332d]">{s.subjectName}</td>
+                          <td className="py-1.5 px-3 text-center border border-stone-200 font-mono">{s.highestMarks ?? '—'}</td>
                           <td className="py-1.5 px-3 text-center border border-stone-200 font-mono">
                             {s.t1 ? `${s.t1.marks}/${s.t1.full}` : '—'}
                           </td>
@@ -1299,7 +1341,7 @@ export default function ResultsModule({
                         </tr>
                       ))}
                       <tr className="bg-[#f5f2ed]/60 font-bold text-stone-900">
-                        <td className="py-1.5 px-3 border border-stone-200 text-right" colSpan={3}>
+                        <td className="py-1.5 px-3 border border-stone-200 text-right" colSpan={4}>
                           Total: {c.totalObtained}/{c.totalFull}
                         </td>
                         <td className="py-1.5 px-3 text-center border border-stone-200 font-mono font-black text-[#4a5d4e]">

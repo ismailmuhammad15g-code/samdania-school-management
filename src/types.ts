@@ -213,6 +213,7 @@ export interface SubjectMark {
   subjectName: string;
   marksObtained: number;
   maxMarks: number;
+  highestMarks?: number;
 }
 
 export interface StudentResult {
