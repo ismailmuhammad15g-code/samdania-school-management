@@ -25,11 +25,9 @@ interface AppManagementPageProps {
   readOnly?: boolean;
   teacherAccounts: TeacherAccount[];
   adminName: string;
-  principalName: string;
-  onUpdatePrincipalName: (name: string) => void;
 }
 
-export default function AppManagementPage({ readOnly = false, teacherAccounts, adminName, principalName, onUpdatePrincipalName }: AppManagementPageProps) {
+export default function AppManagementPage({ readOnly = false, teacherAccounts, adminName }: AppManagementPageProps) {
   const [notices, setNotices] = useState<Notice[]>(readNotices);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -138,22 +136,6 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, a
       {message && <p className="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-4 py-3">{message}</p>}
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {!readOnly && <section className="bg-white border border-stone-200 rounded-xl p-5 space-y-3 lg:col-span-2">
-          <div>
-            <h3 className="font-bold text-sm">Result Report Principal</h3>
-            <p className="text-xs text-stone-500 mt-1">This name appears only in the Principal signature on result reports. It is stored separately from fee/admin recipient names.</p>
-          </div>
-          <label className="block text-xs font-bold text-stone-600">
-            Principal name
-            <input
-              value={principalName}
-              onChange={(event) => onUpdatePrincipalName(event.target.value)}
-              placeholder="Enter the principal's name"
-              className="mt-1 w-full max-w-md border border-stone-200 rounded-lg px-3 py-2 text-sm font-normal"
-              maxLength={100}
-            />
-          </label>
-        </section>}
         {!readOnly && <form onSubmit={sendTeacherNotice} className="bg-white border border-stone-200 rounded-xl p-5 space-y-4 lg:col-span-2">
           <div className="flex items-center gap-2"><Megaphone className="h-4 w-4 text-[#4a5d4e]" /><h3 className="font-bold text-sm">Teacher Noticeboard</h3></div>
           <div className="grid md:grid-cols-2 gap-3">

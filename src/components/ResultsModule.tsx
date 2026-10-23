@@ -21,7 +21,6 @@ interface ResultsModuleProps {
   academicClasses: string[];
   onAddResult: (result: Omit<StudentResult, 'id' | 'recordedBy' | 'date'>) => void;
   onDeleteResult: (id: string) => void;
-  principalName: string;
   readOnly?: boolean;
 }
 
@@ -54,7 +53,6 @@ export default function ResultsModule({
   academicClasses,
   onAddResult,
   onDeleteResult,
-  principalName,
   readOnly,
 }: ResultsModuleProps) {
   const [activeTab, setActiveTab] = useState<'board' | 'enter' | 'combined'>('board');
@@ -313,7 +311,11 @@ export default function ResultsModule({
   })();
 
   const handlePrint = () => {
-    window.print();
+    document.body.classList.add('printing-report', 'printing-result-report');
+    window.addEventListener('afterprint', () => {
+      document.body.classList.remove('printing-report', 'printing-result-report');
+    }, { once: true });
+    window.setTimeout(() => window.print(), 50);
   };
 
   return (
@@ -926,15 +928,15 @@ export default function ResultsModule({
             </button>
           </div>
 
-          <div id="print-area" className="bg-white rounded-xl border border-stone-300 shadow-2xl max-w-2xl w-full p-6 space-y-6 relative mt-16">
+          <div id="print-area" className="result-report-print-area bg-white rounded-xl border border-stone-300 shadow-2xl max-w-2xl w-full p-6 space-y-6 relative mt-16">
             {/* Institution Header */}
             <div className="text-center space-y-1 pb-4 border-b border-[#4a5d4e]/30">
               <img src={logo2} alt="Logo" className="h-14 w-14 object-contain mx-auto" />
               <h3 className="font-serif font-black text-lg text-[#2c332d] tracking-wider uppercase">
                 Samdania Talimul Islam Madrasah
               </h3>
-              <p className="text-[10px] text-stone-500 font-mono">
-                Sajeda Mansion, Bagichagaon, Comilla • Mobile: 01712-421111
+              <p className="text-[10px] text-stone-500 font-mono text-center">
+                ঠিকানা: পীর বদরুল ইসলাম সামদানী কমপ্লেক্স , খানকায়ে ফুরফুরা শরীফ, ২ নং ওয়ার্ড, গলাচিপা, পটুয়াখালী | <span className="inline-block whitespace-nowrap">মোবাইল: 01792776433</span>
               </p>
               <div className="inline-block bg-[#4a5d4e] text-[#d9c5b2] font-serif font-bold text-xs px-4 py-1.5 mt-2 tracking-widest uppercase rounded">
                 Academic Progress Report (পরীক্ষার ফলাফল পত্র)
@@ -1060,17 +1062,17 @@ export default function ResultsModule({
             </div>
 
             {/* Signatures */}
-            <div className="grid grid-cols-2 gap-4 pt-12 text-[10px] text-stone-500 font-bold">
+            <div className="result-report-signatures grid grid-cols-2 gap-4 pt-12 text-[10px] text-stone-500 font-bold">
               <div className="text-center">
-                <div className="border-t border-stone-400 max-w-[150px] mx-auto pt-1 font-serif">
-                  <span className="block">Principal (নাজিম সাহেব)</span>
-                  {principalName && <span className="block">{principalName}</span>}
+                <div className="result-report-signature-rule" />
+                <div className="font-serif leading-tight">
+                  <span className="block">Principal</span>
                   <span className="block">samdaniaa madrasah</span>
                 </div>
               </div>
               <div className="text-center">
-                <div className="border-t border-stone-400 max-w-[150px] mx-auto pt-1 font-serif">Class Muallim</div>
-                <span>Class Teacher (শ্রেণী শিক্ষক)</span>
+                <div className="result-report-signature-rule" />
+                <div className="font-serif leading-tight">Class Teacher (শ্রেণী শিক্ষক)</div>
               </div>
             </div>
           </div>
@@ -1096,15 +1098,15 @@ export default function ResultsModule({
             </button>
           </div>
 
-          <div id="print-area" className="bg-white rounded-xl border border-stone-300 shadow-2xl max-w-2xl w-full p-6 space-y-6 relative mt-16">
+          <div id="print-area" className="result-report-print-area bg-white rounded-xl border border-stone-300 shadow-2xl max-w-2xl w-full p-6 space-y-6 relative mt-16">
             {/* Header */}
             <div className="text-center space-y-1 pb-4 border-b border-[#4a5d4e]/30">
               <img src={logo2} alt="Logo" className="h-14 w-14 object-contain mx-auto" />
               <h3 className="font-serif font-black text-lg text-[#2c332d] tracking-wider uppercase">
                 Samdania Talimul Islam Madrasah
               </h3>
-              <p className="text-[10px] text-stone-500 font-mono">
-                Sajeda Mansion, Bagichagaon, Comilla • Mobile: 01712-421111
+              <p className="text-[10px] text-stone-500 font-mono text-center">
+                ঠিকানা: পীর বদরুল ইসলাম সামদানী কমপ্লেক্স , খানকায়ে ফুরফুরা শরীফ, ২ নং ওয়ার্ড, গলাচিপা, পটুয়াখালী | <span className="inline-block whitespace-nowrap">মোবাইল: 01792776433</span>
               </p>
               <div className="inline-block bg-[#4a5d4e] text-[#d9c5b2] font-serif font-bold text-xs px-4 py-1.5 mt-2 tracking-widest uppercase rounded">
                 Combined Term Result (সম্মিলিত ফলাফল) — {combinedYear}
@@ -1202,17 +1204,17 @@ export default function ResultsModule({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 pt-12 text-[10px] text-stone-500 font-bold">
+            <div className="result-report-signatures grid grid-cols-2 gap-4 pt-12 text-[10px] text-stone-500 font-bold">
               <div className="text-center">
-                <div className="border-t border-stone-400 max-w-[150px] mx-auto pt-1 font-serif">
-                  <span className="block">Principal (নাজিম সাহেব)</span>
-                  {principalName && <span className="block">{principalName}</span>}
+                <div className="result-report-signature-rule" />
+                <div className="font-serif leading-tight">
+                  <span className="block">Principal</span>
                   <span className="block">samdaniaa madrasah</span>
                 </div>
               </div>
               <div className="text-center">
-                <div className="border-t border-stone-400 max-w-[150px] mx-auto pt-1 font-serif">Class Muallim</div>
-                <span>Class Teacher (শ্রেণী শিক্ষক)</span>
+                <div className="result-report-signature-rule" />
+                <div className="font-serif leading-tight">Class Teacher (শ্রেণী শিক্ষক)</div>
               </div>
             </div>
           </div>
@@ -1238,15 +1240,15 @@ export default function ResultsModule({
             </button>
           </div>
 
-          <div id="print-area" className="bg-white rounded-xl border border-stone-300 shadow-2xl max-w-3xl w-full p-6 space-y-6 relative mt-16">
+          <div id="print-area" className="result-report-print-area bg-white rounded-xl border border-stone-300 shadow-2xl max-w-3xl w-full p-6 space-y-6 relative mt-16">
             {/* Header */}
             <div className="text-center space-y-1 pb-4 border-b border-[#4a5d4e]/30">
               <img src={logo2} alt="Logo" className="h-14 w-14 object-contain mx-auto" />
               <h3 className="font-serif font-black text-lg text-[#2c332d] tracking-wider uppercase">
                 Samdania Talimul Islam Madrasah
               </h3>
-              <p className="text-[10px] text-stone-500 font-mono">
-                Sajeda Mansion, Bagichagaon, Comilla • Mobile: 01712-421111
+              <p className="text-[10px] text-stone-500 font-mono text-center">
+                ঠিকানা: পীর বদরুল ইসলাম সামদানী কমপ্লেক্স , খানকায়ে ফুরফুরা শরীফ, ২ নং ওয়ার্ড, গলাচিপা, পটুয়াখালী | <span className="inline-block whitespace-nowrap">মোবাইল: 01792776433</span>
               </p>
               <div className="inline-block bg-[#4a5d4e] text-[#d9c5b2] font-serif font-bold text-xs px-4 py-1.5 mt-2 tracking-widest uppercase rounded">
                 Combined Term Result Sheet (সম্মিলিত ফলাফল) — {combinedYear}

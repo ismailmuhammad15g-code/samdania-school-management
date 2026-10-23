@@ -144,7 +144,6 @@ export default function App() {
   const [academicClasses, setAcademicClasses] = useState<string[]>(DEFAULT_ACADEMIC_CLASSES);
   const [paymentMethods, setPaymentMethods] = useState<string[]>([]);
   const [admins, setAdmins] = useState<string[]>([]); // Names of admins authorized to receive fees
-  const [principalName, setPrincipalName] = useState('');
 
   // Persistent invoice counter — never decrements, survives deletes
   const [invoiceCounter, setInvoiceCounter] = useState<number>(101);
@@ -217,7 +216,6 @@ export default function App() {
     setAcademicClasses(load('samdani_academic_classes', DEFAULT_ACADEMIC_CLASSES));
     setPaymentMethods(load('samdani_payment_methods', []));
     setAdmins(load('samdani_admins', []));
-    setPrincipalName(load('samdani_principal_name', ''));
     setTeacherAccounts(load('samdani_teacher_accounts', [], (v: any[]) =>
       v.map((a) => ({ ...a, status: a.status || (a.registered ? 'verified' : 'unverified') }))
     ));
@@ -314,7 +312,6 @@ export default function App() {
   useEffect(() => { if (canPersist) dbSet('samdani_academic_classes', academicClasses); }, [academicClasses, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_payment_methods', paymentMethods); }, [paymentMethods, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_admins', admins); }, [admins, canPersist]);
-  useEffect(() => { if (canPersist) dbSet('samdani_principal_name', principalName.trim()); }, [principalName, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_teacher_accounts', teacherAccounts); }, [teacherAccounts, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_teacher_routines', teacherRoutines); }, [teacherRoutines, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_teacher_leaves', teacherLeaves); }, [teacherLeaves, canPersist]);
@@ -1478,8 +1475,6 @@ export default function App() {
             readOnly={adminReadOnly}
             teacherAccounts={teacherAccounts}
             adminName={adminName}
-            principalName={principalName}
-            onUpdatePrincipalName={setPrincipalName}
           />
         )}
 
@@ -1525,7 +1520,6 @@ export default function App() {
             students={students}
             results={studentResults}
             academicClasses={academicClasses}
-            principalName={principalName}
             onAddResult={handleAddResult}
             onDeleteResult={handleDeleteResult}
             readOnly={adminReadOnly}
