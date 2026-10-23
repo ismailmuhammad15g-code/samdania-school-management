@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'SolaimanLipi';
+  src: url('./assets/font/SolaimanLipi.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0980-09FF;
+}
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "SolaimanLipi", "Inter", "Noto Sans Bengali", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  
+  --color-natural-brand: #4a5d4e;       /* Deep sage/olive green */
+  --color-natural-brand-hover: #3d4d41; /* Darker sage */
+  --color-natural-bg: #fdfbf7;          /* Warm cream/alabaster */
+  --color-natural-text: #2c332d;        /* Dark forest/slate text */
+  --color-natural-card: #f5f2ed;        /* Soft oatmeal */
+  --color-natural-accent: #d9c5b2;      /* Warm sand/clay */
+  --color-natural-border: #e6e2da;      /* Slightly darker warm border */
+}
+
+/* Custom defaults */
+body {
+  background-color: #fdfbf7;
+  color: #2c332d;
+  font-family: "Plus Jakarta Sans", "SolaimanLipi", "Inter", "Noto Sans Bengali", ui-sans-serif, sans-serif;
+}
+
+.font-bangla {
+  font-family: "SolaimanLipi", "Noto Sans Bengali", sans-serif;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Print: only the report sheet (#print-area) is sent to the printer. */
+@media print {
+  body * { visibility: hidden !important; }
+  #print-area, #print-area * { visibility: visible !important; }
+  #print-area {
+    position: absolute !important;
+    left: 0;
+    top: 0;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  .no-print { display: none !important; }
+}

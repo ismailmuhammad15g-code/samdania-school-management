@@ -1,0 +1,804 @@
+{
+  "samdani_teacher_routines": [],
+  "samdani_hifz_students": [],
+  "samdani_notifications": [],
+  "samdani_admins": [
+    "zaber (accouche admin)",
+    "shumon molla (vice principal)"
+  ],
+  "samdani_hifz_ledger": [],
+  "samdani_hifz_income_categories": [
+    "Hifz Fee Collection",
+    "Donation",
+    "Other Income"
+  ],
+  "samdani_teacher_resignations": [
+    {
+      "id": "RES-MRLLCYGG-440",
+      "teacherId": "97d7f7c6-35af-4585-acaf-6955563d178b",
+      "teacherName": "Ismail",
+      "teacherEmail": "ismail@zetsuserv.com",
+      "reason": "bcs iam admin hahaha",
+      "requestedAt": "2026-07-15T04:39:59.344Z",
+      "status": "approved",
+      "resolvedAt": "2026-07-15T04:41:05.251Z"
+    }
+  ],
+  "samdani_salary_payments": [
+    {
+      "teacherStaffId": "STF-265",
+      "teacherStaffName": "shumun",
+      "month": "July",
+      "year": 2026,
+      "date": "2026-07-15",
+      "amount": 5,
+      "allowance": 0,
+      "deduction": 0,
+      "netPaid": 0.1,
+      "paymentMode": "bkash",
+      "id": "SP-5300",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "teacherStaffId": "STF-265",
+      "teacherStaffName": "shumun",
+      "month": "July",
+      "year": 2026,
+      "date": "2026-07-15",
+      "amount": 5,
+      "allowance": 0,
+      "deduction": 0,
+      "netPaid": 4,
+      "paymentMode": "bkash",
+      "id": "SP-9941",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "teacherStaffId": "STF-230",
+      "teacherStaffName": "Sumon",
+      "month": "July",
+      "year": 2026,
+      "date": "2026-07-15",
+      "amount": 1000000,
+      "allowance": 0,
+      "deduction": 0,
+      "netPaid": 990000,
+      "paymentMode": "Nagad",
+      "id": "SP-8592",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "teacherStaffId": "STF-230",
+      "teacherStaffName": "Sumon",
+      "month": "July",
+      "year": 2026,
+      "date": "2026-07-15",
+      "amount": 1000000,
+      "allowance": 0,
+      "deduction": 0,
+      "netPaid": 10000,
+      "paymentMode": "cash",
+      "id": "SP-5382",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "teacherStaffId": "STF-719",
+      "teacherStaffName": "Yaser",
+      "month": "July",
+      "year": 2026,
+      "date": "2026-07-15",
+      "amount": 1000,
+      "allowance": 0,
+      "deduction": 0,
+      "netPaid": 100,
+      "paymentMode": "cash",
+      "id": "SP-7678",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "teacherStaffId": "STF-772",
+      "teacherStaffName": "yaser",
+      "month": "July",
+      "year": 2026,
+      "date": "2026-07-14",
+      "amount": 1000,
+      "allowance": 0,
+      "deduction": 0,
+      "netPaid": 100,
+      "paymentMode": "cash",
+      "id": "SP-7201",
+      "recordedBy": "samdaniaa madrasah"
+    }
+  ],
+  "samdani_hifz_expense_categories": [
+    "Teacher Salary",
+    "Utilities",
+    "Rent",
+    "Food & Hostel",
+    "Other Expense"
+  ],
+  "samdani_loans": [
+    {
+      "date": "2026-07-15",
+      "type": "Taken",
+      "personName": "johir",
+      "contact": "2225222",
+      "amount": 120000,
+      "description": "jjhgyuui",
+      "id": "LN-557",
+      "repaidAmount": 120000,
+      "status": "Settled",
+      "recordedBy": "samdaniaa madrasah"
+    }
+  ],
+  "samdani_teacher_session": {
+    "version": 1,
+    "accountId": "e449082e-53dd-45d3-aefc-2b7dc9854fb1",
+    "email": "yaser@gmail.com",
+    "fullName": "yaser",
+    "issuedAt": "2026-07-15T01:15:28.434Z"
+  },
+  "samdani_assistant_chat": [
+    {
+      "id": "u-1784127343389",
+      "role": "user",
+      "content": "he"
+    },
+    {
+      "id": "a-1784127344048",
+      "role": "assistant",
+      "content": "It seems like your question got cut off. Could you please rephrase or complete your question so I can assist you better?"
+    },
+    {
+      "id": "u-1784127355469",
+      "role": "user",
+      "content": "add amount"
+    },
+    {
+      "id": "e-1784127356293",
+      "role": "assistant",
+      "content": "⚠️ **Error:** Groq API error 400: tool call validation failed: parameters for tool read_data did not match schema: errors: [`/limit`: expected number, but got string]\n\nPlease check the .env Groq configuration and try again.",
+      "error": true
+    },
+    {
+      "id": "u-1784127366061",
+      "role": "user",
+      "content": "add amount 100 to loan"
+    },
+    {
+      "id": "e-1784127366359",
+      "role": "assistant",
+      "content": "⚠️ **Error:** Groq rate limit reached. Please wait a moment and try again.\n\nPlease check the .env Groq configuration and try again.",
+      "error": true
+    }
+  ],
+  "samdani_invoice_counter": 106,
+  "samdani_attendance_qrset": {
+    "id": "ATT-MRLBXY71-C9AB1D80",
+    "generatedAt": "2026-07-15T00:16:22.622Z",
+    "startDate": "2026-07-15",
+    "secret": "0fb7812eed51248ff78e2759ac6457b21b3c939944a7818dffce58006cbb8c1d",
+    "days": [
+      {
+        "index": 1,
+        "date": "2026-07-15",
+        "token": "SAMDANIA_ATT|ATT-MRLBXY71-C9AB1D80|2026-07-15|1887d5e310ee3e5fda1ccc71aa5eeeae"
+      },
+      {
+        "index": 2,
+        "date": "2026-07-16",
+        "token": "SAMDANIA_ATT|ATT-MRLBXY71-C9AB1D80|2026-07-16|68acd19be40cc3a3e56d3f3e42f05502"
+      },
+      {
+        "index": 3,
+        "date": "2026-07-17",
+        "token": "SAMDANIA_ATT|ATT-MRLBXY71-C9AB1D80|2026-07-17|b3f6653d8f04f3ea93554121518dd5b1"
+      },
+      {
+        "index": 4,
+        "date": "2026-07-18",
+        "token": "SAMDANIA_ATT|ATT-MRLBXY71-C9AB1D80|2026-07-18|0ff4b1bc0e4d43b63d3266a6786123f9"
+      },
+      {
+        "index": 5,
+        "date": "2026-07-19",
+        "token": "SAMDANIA_ATT|ATT-MRLBXY71-C9AB1D80|2026-07-19|ff695273e42514a833168d719f653876"
+      },
+      {
+        "index": 6,
+        "date": "2026-07-20",
+        "token": "SAMDANIA_ATT|ATT-MRLBXY71-C9AB1D80|2026-07-20|575556cef2af08f5f8e3f463bf1cc4d6"
+      },
+      {
+        "index": 7,
+        "date": "2026-07-21",
+        "token": "SAMDANIA_ATT|ATT-MRLBXY71-C9AB1D80|2026-07-21|99b4f5f93c7935c8cef0d9afd59feb9c"
+      },
+      {
+        "index": 8,
+        "date": "2026-07-22",
+        "token": "SAMDANIA_ATT|ATT-MRLBXY71-C9AB1D80|2026-07-22|1347018906725279d20b67bb03b53912"
+      },
+      {
+        "index": 9,
+        "date": "2026-07-23",
+        "token": "SAMDANIA_ATT|ATT-MRLBXY71-C9AB1D80|2026-07-23|97d00431580353f51f1ba3c84a6c73e7"
+      },
+      {
+        "index": 10,
+        "date": "2026-07-24",
+        "token": "SAMDANIA_ATT|ATT-MRLBXY71-C9AB1D80|2026-07-24|e152f36be86d4fb09486e58209418989"
+      },
+      {
+        "index": 11,
+        "date": "2026-07-25",
+        "token": "SAMDANIA_ATT|ATT-MRLBXY71-C9AB1D80|2026-07-25|7ba44ae859a506a1c96c4dd27365b423"
+      },
+      {
+        "index": 12,
+        "date": "2026-07-26",
+        "token": "SAMDANIA_ATT|ATT-MRLBXY71-C9AB1D80|2026-07-26|622943f7a4a1154052c54a6841a87dec"
+      }
+    ]
+  },
+  "samdani_teachers_staff": [
+    {
+      "id": "STF-265",
+      "name": "shumun",
+      "role": "Teacher",
+      "designation": "shumun",
+      "baseSalary": 5,
+      "contact": "",
+      "email": "shumun@gmail.com",
+      "bio": ""
+    },
+    {
+      "id": "STF-435",
+      "name": "saimon",
+      "role": "Teacher",
+      "designation": "saimon",
+      "baseSalary": 400,
+      "contact": "",
+      "email": "saimon@gmail.com",
+      "bio": ""
+    },
+    {
+      "id": "STF-420",
+      "name": "Sumon",
+      "role": "Teacher",
+      "designation": "Admin",
+      "baseSalary": 10000,
+      "contact": "",
+      "email": "sumon@gmail.com",
+      "bio": "Sir"
+    }
+  ],
+  "samdani_student_results": [],
+  "samdani_payments": [
+    {
+      "studentId": "ST-107",
+      "studentName": "alamin",
+      "class": "Class 5",
+      "month": "July",
+      "date": "2026-07-15",
+      "previousDue": 0,
+      "currentMonthFee": 8000,
+      "examFee": 0,
+      "transport": 70,
+      "electricity": 0,
+      "water": 0,
+      "waiver": 0,
+      "advancePaid": 0,
+      "totalPayable": 8070,
+      "amountPaid": 5,
+      "receivedBy": "zaber (accouche admin)",
+      "id": "PAY-1437",
+      "receiptNo": "REC20260715-105",
+      "invoiceNo": 105,
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "studentId": "ST-719",
+      "studentName": "arafat",
+      "class": "Class 5",
+      "month": "July",
+      "date": "2026-07-15",
+      "previousDue": 1000,
+      "currentMonthFee": 0,
+      "examFee": 0,
+      "transport": 0,
+      "electricity": 0,
+      "water": 0,
+      "waiver": 0,
+      "advancePaid": 0,
+      "totalPayable": 1000,
+      "amountPaid": 500,
+      "receivedBy": "zaber (accouche admin)",
+      "id": "PAY-2856",
+      "receiptNo": "REC20260715-104",
+      "invoiceNo": 104,
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "studentId": "ST-719",
+      "studentName": "arafat",
+      "class": "Class 5",
+      "month": "July",
+      "date": "2026-07-15",
+      "previousDue": 0,
+      "currentMonthFee": 1000,
+      "examFee": 0,
+      "transport": 800,
+      "electricity": 0,
+      "water": 0,
+      "waiver": 0,
+      "advancePaid": 0,
+      "totalPayable": 1800,
+      "amountPaid": 800,
+      "receivedBy": "zaber (accouche admin)",
+      "id": "PAY-0540",
+      "receiptNo": "REC20260715-103",
+      "invoiceNo": 103,
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "studentId": "ST-618",
+      "studentName": "rahim",
+      "class": "Class 4",
+      "month": "July",
+      "date": "2026-07-14",
+      "previousDue": 20,
+      "currentMonthFee": 0,
+      "examFee": 0,
+      "transport": 0,
+      "electricity": 0,
+      "water": 0,
+      "waiver": 0,
+      "advancePaid": 0,
+      "totalPayable": 20,
+      "amountPaid": 10,
+      "receivedBy": "zaber (accouche admin)",
+      "id": "PAY-6616",
+      "receiptNo": "REC20260714-102",
+      "invoiceNo": 102,
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "studentId": "ST-618",
+      "studentName": "rahim",
+      "class": "Class 4",
+      "month": "July",
+      "date": "2026-07-14",
+      "previousDue": 0,
+      "currentMonthFee": 100,
+      "examFee": 0,
+      "transport": 0,
+      "electricity": 0,
+      "water": 0,
+      "waiver": 0,
+      "advancePaid": 0,
+      "totalPayable": 100,
+      "amountPaid": 80,
+      "id": "PAY-0178",
+      "receiptNo": "REC20260714-101",
+      "invoiceNo": 101,
+      "recordedBy": "Mawlana Samdani"
+    }
+  ],
+  "samdani_student_attendance_records": [
+    {
+      "id": "e9d6142a-dc86-423f-bd5d-aa8a73f4bbbb_shishu_2026-07-15",
+      "teacherId": "e9d6142a-dc86-423f-bd5d-aa8a73f4bbbb",
+      "teacherName": "Yaser",
+      "className": "shishu",
+      "date": "2026-07-15",
+      "createdAt": "2026-07-15T12:05:17.324Z",
+      "statuses": []
+    },
+    {
+      "id": "e9d6142a-dc86-423f-bd5d-aa8a73f4bbbb_Class 5_2026-07-15",
+      "teacherId": "e9d6142a-dc86-423f-bd5d-aa8a73f4bbbb",
+      "teacherName": "Yaser",
+      "className": "Class 5",
+      "date": "2026-07-15",
+      "createdAt": "2026-07-15T05:57:36.512Z",
+      "statuses": [
+        {
+          "id": "ST-719_2026-07-15",
+          "studentId": "ST-719",
+          "studentName": "arafat",
+          "className": "Class 5",
+          "present": false,
+          "late": false,
+          "dairy": false,
+          "uniform": false,
+          "recordedAt": "2026-07-15T05:57:36.512Z",
+          "teacherId": "e9d6142a-dc86-423f-bd5d-aa8a73f4bbbb",
+          "teacherName": "Yaser",
+          "date": "2026-07-15"
+        },
+        {
+          "id": "ST-107_2026-07-15",
+          "studentId": "ST-107",
+          "studentName": "alamin",
+          "className": "Class 5",
+          "present": true,
+          "late": false,
+          "dairy": false,
+          "uniform": false,
+          "note": "টিউটোরিয়াল আদায়",
+          "recordedAt": "2026-07-15T05:57:36.512Z",
+          "teacherId": "e9d6142a-dc86-423f-bd5d-aa8a73f4bbbb",
+          "teacherName": "Yaser",
+          "date": "2026-07-15"
+        }
+      ]
+    },
+    {
+      "id": "e449082e-53dd-45d3-aefc-2b7dc9854fb1_Class 4_2026-07-15",
+      "teacherId": "e449082e-53dd-45d3-aefc-2b7dc9854fb1",
+      "teacherName": "yaser",
+      "className": "Class 4",
+      "date": "2026-07-15",
+      "createdAt": "2026-07-15T01:54:13.800Z",
+      "statuses": [
+        {
+          "id": "ST-618_2026-07-15",
+          "studentId": "ST-618",
+          "studentName": "rahim",
+          "className": "Class 4",
+          "present": true,
+          "late": false,
+          "dairy": true,
+          "uniform": true,
+          "recordedAt": "2026-07-15T01:54:13.800Z",
+          "teacherId": "e449082e-53dd-45d3-aefc-2b7dc9854fb1",
+          "teacherName": "yaser",
+          "date": "2026-07-15"
+        }
+      ]
+    },
+    {
+      "id": "97d7f7c6-35af-4585-acaf-6955563d178b_Class 4_2026-07-15",
+      "teacherId": "97d7f7c6-35af-4585-acaf-6955563d178b",
+      "teacherName": "Ismail",
+      "className": "Class 4",
+      "date": "2026-07-15",
+      "createdAt": "2026-07-15T01:27:35.888Z",
+      "statuses": [
+        {
+          "id": "ST-618_2026-07-15",
+          "studentId": "ST-618",
+          "studentName": "rahim",
+          "className": "Class 4",
+          "status": "dairy",
+          "note": "Aded",
+          "recordedAt": "2026-07-15T01:27:35.886Z",
+          "teacherId": "97d7f7c6-35af-4585-acaf-6955563d178b",
+          "teacherName": "Ismail",
+          "date": "2026-07-15",
+          "present": true,
+          "late": false,
+          "dairy": true,
+          "uniform": false
+        }
+      ]
+    }
+  ],
+  "samdani_salary_visible": [
+    "e9d6142a-dc86-423f-bd5d-aa8a73f4bbbb",
+    "039225ff-83c4-4d9f-be8d-29b619e9df43",
+    "24bf914f-bd20-49d8-baa5-d211b96f131f"
+  ],
+  "samdani_students": [
+    {
+      "name": "arafat",
+      "roll": 4,
+      "class": "Class 5",
+      "contact": "017514",
+      "previousDue": 500,
+      "currentMonthFee": 0,
+      "examFee": 0,
+      "transport": 0,
+      "electricity": 0,
+      "water": 0,
+      "waiver": 0,
+      "advancePaid": 0,
+      "id": "ST-719"
+    },
+    {
+      "name": "alamin",
+      "roll": 8,
+      "class": "Class 5",
+      "contact": "",
+      "previousDue": 8065,
+      "currentMonthFee": 0,
+      "examFee": 0,
+      "transport": 0,
+      "electricity": 0,
+      "water": 0,
+      "waiver": 0,
+      "advancePaid": 0,
+      "id": "ST-107"
+    },
+    {
+      "name": "ahmed",
+      "roll": 15,
+      "class": "Class 5",
+      "contact": "0129392392392",
+      "fatherName": "ali baba",
+      "motherName": "",
+      "extraInfo": "",
+      "previousDue": 0,
+      "currentMonthFee": 0,
+      "examFee": 0,
+      "transport": 0,
+      "electricity": 0,
+      "water": 0,
+      "waiver": 0,
+      "advancePaid": 0,
+      "id": "ST-896"
+    }
+  ],
+  "samdani_teacher_leaves": [],
+  "samdani_ledger": [
+    {
+      "id": "TX-5301",
+      "date": "2026-07-15",
+      "type": "Expense",
+      "fund": "General",
+      "category": "Staff Salary",
+      "amount": 0.1,
+      "description": "Salary paid: shumun (July 2026)",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "id": "TX-9941",
+      "date": "2026-07-15",
+      "type": "Expense",
+      "fund": "General",
+      "category": "Staff Salary",
+      "amount": 4,
+      "description": "Salary paid: shumun (July 2026)",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "id": "TX-8596",
+      "date": "2026-07-15",
+      "type": "Expense",
+      "fund": "General",
+      "category": "Teacher Salary",
+      "amount": 990000,
+      "description": "Salary paid: Sumon (July 2026)",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "id": "TX-5382",
+      "date": "2026-07-15",
+      "type": "Expense",
+      "fund": "General",
+      "category": "Staff Salary",
+      "amount": 10000,
+      "description": "Salary paid: Sumon (July 2026)",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "id": "TX-7678",
+      "date": "2026-07-15",
+      "type": "Expense",
+      "fund": "General",
+      "category": "Staff Salary",
+      "amount": 100,
+      "description": "Salary paid: Yaser (July 2026)",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "id": "TX-1437",
+      "date": "2026-07-15",
+      "type": "Income",
+      "fund": "General",
+      "category": "Monthly Tuition",
+      "amount": 5,
+      "description": "Fees collected: alamin (Class 5 - July)",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "id": "TX-5525",
+      "date": "2026-07-15",
+      "type": "Expense",
+      "fund": "Loan",
+      "category": "Loan Repaid (ঋণ পরিশোধ)",
+      "amount": 120000,
+      "description": "Repayment of taken loan from johir",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "id": "TX-2012",
+      "date": "2026-07-15",
+      "type": "Income",
+      "fund": "Loan",
+      "category": "Loan Received (ঋণ গ্রহণ)",
+      "amount": 120000,
+      "description": "Taken loan: johir",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "id": "TX-2857",
+      "date": "2026-07-15",
+      "type": "Income",
+      "fund": "General",
+      "category": "Monthly Tuition",
+      "amount": 500,
+      "description": "Fees collected: arafat (Class 5 - July)",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "id": "TX-0540",
+      "date": "2026-07-15",
+      "type": "Income",
+      "fund": "General",
+      "category": "Monthly Tuition",
+      "amount": 800,
+      "description": "Fees collected: arafat (Class 5 - July)",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "id": "TX-7201",
+      "date": "2026-07-14",
+      "type": "Expense",
+      "fund": "General",
+      "category": "Staff Salary",
+      "amount": 100,
+      "description": "Salary paid: yaser (July 2026)",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "id": "TX-6616",
+      "date": "2026-07-14",
+      "type": "Income",
+      "fund": "General",
+      "category": "Monthly Tuition",
+      "amount": 10,
+      "description": "Fees collected: rahim (Class 4 - July)",
+      "recordedBy": "samdaniaa madrasah"
+    },
+    {
+      "id": "TX-0183",
+      "date": "2026-07-14",
+      "type": "Income",
+      "fund": "General",
+      "category": "Monthly Tuition",
+      "amount": 80,
+      "description": "Fees collected: rahim (Class 4 - July)",
+      "recordedBy": "Mawlana Samdani"
+    }
+  ],
+  "samdani_academic_classes": [
+    "Class 1",
+    "Class 2",
+    "Class 3",
+    "Class 4",
+    "Class 5",
+    "shishu"
+  ],
+  "samdani_hifz_payments": [],
+  "samdani_teacher_accounts": [
+    {
+      "id": "02f0423b-18b1-480f-a2fb-c02c91ee3011",
+      "fullName": "ismail",
+      "designation": "ismail mohammad",
+      "email": "ismail@gmail.com",
+      "password": "ismail",
+      "bio": "iam ismail and samile :)",
+      "registered": true,
+      "status": "verified",
+      "createdAt": "2026-07-15T04:42:59.243Z",
+      "photoUrl": "data:image/jpeg;base64,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",
+      "role": "ismail mohammad"
+    },
+    {
+      "id": "24bf914f-bd20-49d8-baa5-d211b96f131f",
+      "fullName": "Sumon",
+      "designation": "Admin",
+      "email": "sumon@gmail.com",
+      "password": "1234",
+      "bio": "Sir",
+      "registered": true,
+      "status": "verified",
+      "createdAt": "2026-07-15T12:40:23.999Z",
+      "photoUrl": "https://i.ibb.co/QZ1KPys/454b785926c7.jpg",
+      "role": "Admin"
+    },
+    {
+      "id": "11c4cd1a-cf98-4752-8c47-0290b9991345",
+      "fullName": "shumun",
+      "designation": "shumun",
+      "email": "shumun@gmail.com",
+      "password": "shumun",
+      "bio": "",
+      "registered": false,
+      "status": "rejected",
+      "createdAt": "2026-07-15T12:42:09.899Z",
+      "rejectionReason": "lazy",
+      "rejectedAt": "2026-07-15T13:01:40.510Z"
+    },
+    {
+      "id": "039225ff-83c4-4d9f-be8d-29b619e9df43",
+      "fullName": "saimon",
+      "designation": "saimon",
+      "email": "saimon@gmail.com",
+      "password": "saimon",
+      "bio": "",
+      "registered": false,
+      "status": "rejected",
+      "createdAt": "2026-07-15T12:48:58.914Z",
+      "rejectionReason": "lazy man",
+      "rejectedAt": "2026-07-15T13:01:47.374Z"
+    }
+  ],
+  "samdani_loan_payments": [
+    {
+      "loanId": "LN-557",
+      "date": "2026-07-15",
+      "amount": 120000,
+      "type": "Repayment",
+      "id": "LNP-5524",
+      "recordedBy": "samdaniaa madrasah"
+    }
+  ],
+  "samdani_payment_methods": [
+    "cash",
+    "bkash",
+    "bank transfer",
+    "Nagad"
+  ],
+  "samdani_attendance_records": [
+    {
+      "id": "24bf914f-bd20-49d8-baa5-d211b96f131f_2026-07-15",
+      "teacherId": "24bf914f-bd20-49d8-baa5-d211b96f131f",
+      "teacherName": "Sumon",
+      "date": "2026-07-15",
+      "entryTime": "2026-07-15T13:05:18.330Z",
+      "exitTime": "2026-07-15T13:06:25.871Z"
+    },
+    {
+      "id": "e9d6142a-dc86-423f-bd5d-aa8a73f4bbbb_2026-07-15",
+      "teacherId": "e9d6142a-dc86-423f-bd5d-aa8a73f4bbbb",
+      "teacherName": "Yaser",
+      "date": "2026-07-15",
+      "entryTime": "2026-07-15T05:16:21.675Z",
+      "exitTime": "2026-07-15T12:04:00.084Z"
+    },
+    {
+      "id": "97d7f7c6-35af-4585-acaf-6955563d178b_2026-07-15",
+      "teacherId": "97d7f7c6-35af-4585-acaf-6955563d178b",
+      "teacherName": "Ismail",
+      "date": "2026-07-15",
+      "entryTime": "2026-07-15T00:30:40.040Z",
+      "exitTime": "2026-07-15T01:01:22.893Z"
+    },
+    {
+      "id": "e449082e-53dd-45d3-aefc-2b7dc9854fb1_2026-07-15",
+      "teacherId": "e449082e-53dd-45d3-aefc-2b7dc9854fb1",
+      "teacherName": "yaser",
+      "date": "2026-07-15",
+      "entryTime": "2026-07-15T00:17:13.087Z",
+      "exitTime": "2026-07-15T00:17:38.207Z"
+    }
+  ],
+  "samdani_hifz_academic_classes": [
+    "Hifz"
+  ],
+  "samdani_hifz_invoice_counter": 101,
+  "samdani_settings_password_hash": "be71c73b5bcef9fad6a4ecee502da19fc01fc9b1bfb57890df2c276968d17563",
+  "samdani_viewer_password_hash": "eab7c1f5ca8f3f6b0239999002711e96c9bdb485bdfb19a9cb7dd4469223592b",
+  "samdani_admin_session": {
+    "email": "samdania@madrasah.com",
+    "name": "samdaniaa madrasah",
+    "loggedInAt": "2026-07-15T16:52:04.554Z"
+  },
+  "samdani_admin_credentials": {
+    "email": "samdania@madrasah.com",
+    "passwordHash": "a458d28e906346d9bb2884dbcf97875a1ecaad38a13da1f9827e00cef42d47d4"
+  }
+}

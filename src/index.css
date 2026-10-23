@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@font-face {
+  font-family: 'SolaimanLipi';
+  src: url('./assets/font/SolaimanLipi.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0980-09FF;
+}
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", "SolaimanLipi", "Inter", "Noto Sans Bengali", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  
+  --color-natural-brand: #4a5d4e;       /* Deep sage/olive green */
+  --color-natural-brand-hover: #3d4d41; /* Darker sage */
+  --color-natural-bg: #fdfbf7;          /* Warm cream/alabaster */
+  --color-natural-text: #2c332d;        /* Dark forest/slate text */
+  --color-natural-card: #f5f2ed;        /* Soft oatmeal */
+  --color-natural-accent: #d9c5b2;      /* Warm sand/clay */
+  --color-natural-border: #e6e2da;      /* Slightly darker warm border */
+}
+
+/* Custom defaults */
+body {
+  background-color: #fdfbf7;
+  color: #2c332d;
+  font-family: "Plus Jakarta Sans", "SolaimanLipi", "Inter", "Noto Sans Bengali", ui-sans-serif, sans-serif;
+}
+
+.font-bangla {
+  font-family: "SolaimanLipi", "Noto Sans Bengali", sans-serif;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Print: only the report sheet (#print-slips-container) is sent to the printer. */
+@media print {
+  body * { visibility: hidden !important; }
+  #print-slips-container, #print-slips-container * { visibility: visible !important; }
+  body > *:not(#print-slips-container) { display: none !important; }
+  
+  @page {
+    size: A4 portrait;
+    margin: 10mm; /* Standard printable margin */
+  }
+  
+  /* The wrapper that holds exactly 8 students */
+  .a4-page-wrapper {
+    height: 277mm; /* A4 height minus the 10mm top/bottom margins */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    page-break-after: always; /* Force a new page after every 8 slips */
+  }
+
+  /* The individual Student Slip (exactly 1/8th of the page) */
+  .due-slip {
+    height: calc(100% / 8 - 4px); /* Divide height by 8, minus gap space */
+    border: 2px solid #000; /* Heavy outer border */
+    box-sizing: border-box;
+    padding: 2px 4px;
+    margin-bottom: 2px;
+    overflow: hidden;
+  }
+
+  /* Inner Grid Thin Borders */
+  .due-slip-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #000;
+  }
+  .due-slip-table td, .due-slip-table th {
+    border: 1px solid #000; /* Thin inner borders */
+    font-size: 11px;
+    padding: 1px 4px;
+  }
+}
