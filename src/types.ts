@@ -117,6 +117,29 @@ export interface TeacherPortalSession {
   issuedAt: string;
 }
 
+export interface StaffAccount {
+  id: string;
+  fullName: string;
+  role: string;
+  email: string;
+  password: string;
+  phone: string;
+  bio: string;
+  contactInfo: string;
+  photoUrl?: string;
+  createdAt: string;
+  status: 'pending' | 'approved';
+}
+
+export interface StaffPortalSession {
+  version: number;
+  sessionId: string;
+  accountId: string;
+  email: string;
+  fullName: string;
+  issuedAt: string;
+}
+
 export interface StudentAttendanceStatus {
   id: string;
   studentId: string;

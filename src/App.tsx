@@ -16,6 +16,8 @@ import {
   AttendanceQRSet,
   AttendanceRecord,
   TeacherPortalSession,
+  StaffAccount,
+  StaffPortalSession,
   StudentAttendanceRecord,
   StudentAttendanceStatus,
   TeacherResignationRequest
@@ -25,6 +27,7 @@ import { pushNotification } from './lib/notifications';
 import { getSession, logoutAdmin, setAdminReadOnlyFlag, getAdminReadOnlyFlag, ensureAdminCredentials } from './lib/auth';
 import { verifyScanned, generateQRSet, todayISO, type AttendanceScanResult } from './lib/attendance';
 import { clearTeacherPortalSession, createTeacherPortalSession, persistTeacherPortalSession, validateTeacherPortalSession, loadTeacherPortalSession } from './lib/teacherSessions';
+import { clearStaffPortalSession, createStaffPortalSession, persistStaffPortalSession, validateStaffPortalSession, loadStaffPortalSession } from './lib/staffSessions';
 
 import LoginPage from './components/LoginPage';
 import AdminRoleSelect from './components/AdminRoleSelect';
@@ -43,6 +46,8 @@ import HifzModule from './components/HifzModule';
 import StudentSummaryModule from './components/StudentSummaryModule';
 import Onboarding from './components/Onboarding';
 import TeacherAuth from './components/TeacherAuth';
+import StaffAuth from './components/StaffAuth';
+import StaffDashboard from './components/StaffDashboard';
 import TeacherDashboard from './components/TeacherDashboard';
 import TeacherSettings from './components/TeacherSettings';
 import TeacherProfileCompletion from './components/TeacherProfileCompletion';
@@ -55,6 +60,11 @@ import AppManagementPage from './components/AppManagementPage';
 import MissingFilloutsPage from './components/MissingFilloutsPage';
 import { tabToPath, pathToTab, type AppTab } from './lib/routes';
 import type { AgentActions } from './lib/aiTools';
+
+function accountIsNonTeachingStaff(account: TeacherAccount): boolean {
+  const roleDescription = `${account.role || ''} ${account.designation || ''}`.toLowerCase();
+  return /\b(staff|driver|cleaner|guard|security|accountant|cook|caretaker|peon|janitor|maintenance|office)\b/.test(roleDescription);
+}
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -124,6 +134,7 @@ export default function App() {
 
   // ── TEACHER ACCOUNTS (created via onboarding) & teacher session ──
   const [teacherAccounts, setTeacherAccounts] = useState<TeacherAccount[]>([]);
+  const [staffAccounts, setStaffAccounts] = useState<StaffAccount[]>([]);
   const [teacherRoutines, setTeacherRoutines] = useState<TeacherRoutine[]>([]);
   // Teacher leave records (ছুটি) — managed by admin, viewed by teacher
   const [teacherLeaves, setTeacherLeaves] = useState<TeacherLeave[]>([]);
@@ -136,7 +147,8 @@ export default function App() {
   // Per-teacher salary-reveal preference (persisted so it survives refresh)
   const [salaryVisibleTeachers, setSalaryVisibleTeachers] = useState<string[]>([]);
   const [teacherSession, setTeacherSession] = useState<TeacherPortalSession | null>(null);
-  const [preAuthView, setPreAuthView] = useState<'onboarding' | 'adminRole' | 'adminLogin' | 'viewerGate' | 'teacherAuth'>('onboarding');
+  const [staffSession, setStaffSession] = useState<StaffPortalSession | null>(null);
+  const [preAuthView, setPreAuthView] = useState<'onboarding' | 'adminRole' | 'adminLogin' | 'viewerGate' | 'teacherAuth' | 'staffAuth'>('onboarding');
   const [teacherView, setTeacherView] = useState<'dashboard' | 'settings'>('dashboard');
   const [settingsUnlocked, setSettingsUnlocked] = useState(false);
   const [attendanceRouteToken, setAttendanceRouteToken] = useState<string | null>(null);
@@ -219,6 +231,12 @@ export default function App() {
     setTeacherAccounts(load('samdani_teacher_accounts', [], (v: any[]) =>
       v.map((a) => ({ ...a, status: a.status || (a.registered ? 'verified' : 'unverified') }))
     ));
+    const savedStaffAccounts = load<StaffAccount[]>('samdani_staff_accounts', []);
+    const salaryRoster = load<TeacherStaff[]>('samdani_teachers_staff', []);
+    setStaffAccounts(savedStaffAccounts.map((account) => ({
+      ...account,
+      status: account.status || (salaryRoster.some((staff) => staff.role === 'Staff' && staff.email.toLowerCase() === account.email.toLowerCase()) ? 'approved' : 'pending'),
+    })));
     setTeacherRoutines(load('samdani_teacher_routines', []));
     setTeacherLeaves(load('samdani_teacher_leaves', []));
     setTeacherResignations(load('samdani_teacher_resignations', []));
@@ -313,6 +331,7 @@ export default function App() {
   useEffect(() => { if (canPersist) dbSet('samdani_payment_methods', paymentMethods); }, [paymentMethods, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_admins', admins); }, [admins, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_teacher_accounts', teacherAccounts); }, [teacherAccounts, canPersist]);
+  useEffect(() => { if (canPersist) dbSet('samdani_staff_accounts', staffAccounts); }, [staffAccounts, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_teacher_routines', teacherRoutines); }, [teacherRoutines, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_teacher_leaves', teacherLeaves); }, [teacherLeaves, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_teacher_resignations', teacherResignations); }, [teacherResignations, canPersist]);
@@ -357,6 +376,66 @@ export default function App() {
     const restored = loadTeacherPortalSession();
     if (restored) setTeacherSession(restored);
   }, [dbReady, teacherRestored]);
+
+  useEffect(() => {
+    if (!dbReady || !dbHydrated || !staffSession) return;
+    const account = staffAccounts.find((item) => item.id === staffSession.accountId);
+    if (account && validateStaffPortalSession(staffSession, account)) return;
+    setStaffSession(null);
+    clearStaffPortalSession();
+  }, [dbReady, dbHydrated, staffAccounts, staffSession]);
+
+  useEffect(() => {
+    if (!dbReady || !dbHydrated || !teacherSession) return;
+    const account = teacherAccounts.find((item) => item.id === teacherSession.accountId);
+    if (!account || !accountIsNonTeachingStaff(account)) return;
+
+    const matchingStaff = staffAccounts.find((item) => item.email.toLowerCase() === account.email.toLowerCase());
+    const migrated: StaffAccount = matchingStaff || {
+      id: account.id,
+      fullName: account.fullName,
+      role: account.role || account.designation || 'Staff',
+      email: account.email,
+      password: account.password,
+      phone: account.contact || '',
+      bio: account.bio || '',
+      contactInfo: '',
+      photoUrl: account.photoUrl,
+      createdAt: account.createdAt,
+      status: account.registered && account.status === 'verified' ? 'approved' : 'pending',
+    };
+    setStaffAccounts((previous) => previous.some((item) => item.email.toLowerCase() === migrated.email.toLowerCase())
+      ? previous.map((item) => item.email.toLowerCase() === migrated.email.toLowerCase() ? migrated : item)
+      : [...previous, migrated]);
+    setTeachersStaff((previous) => previous.map((item) => item.email.toLowerCase() === account.email.toLowerCase()
+      ? { ...item, role: 'Staff', designation: migrated.role, name: migrated.fullName, contact: migrated.phone, bio: migrated.bio }
+      : item));
+    setTeacherLeaves((previous) => previous.map((leave) => leave.teacherId === account.id
+      ? { ...leave, teacherId: migrated.id }
+      : leave));
+    setAttendanceRecords((previous) => previous.map((record) => record.teacherId === account.id
+      ? { ...record, id: `${migrated.id}_${record.date}`, teacherId: migrated.id, teacherName: migrated.fullName }
+      : record));
+    setTeacherRoutines((previous) => previous.filter((routine) => routine.teacherId !== account.id));
+    setTeacherAccounts((previous) => previous.filter((item) => item.id !== account.id));
+    clearTeacherPortalSession();
+    setTeacherSession(null);
+    const nextSession = createStaffPortalSession(migrated);
+    setStaffSession(nextSession);
+    persistStaffPortalSession(nextSession);
+  }, [dbReady, dbHydrated, teacherAccounts, teacherSession, staffAccounts]);
+
+  const [staffRestored, setStaffRestored] = useState(false);
+  useEffect(() => {
+    if (!dbReady || !dbHydrated || staffRestored) return;
+    setStaffRestored(true);
+    const restored = loadStaffPortalSession();
+    if (restored) setStaffSession(restored);
+  }, [dbReady, dbHydrated, staffRestored]);
+
+  useEffect(() => {
+    if (dbReady && staffSession) persistStaffPortalSession(staffSession);
+  }, [staffSession, dbReady]);
 
   // Auto-cleanup: permanently delete rejected teacher accounts that have not been
   // visited for more than 1 day (24h) since they were rejected.
@@ -684,6 +763,8 @@ export default function App() {
       alert('This teacher account could not be found. Please try again.');
       return;
     }
+    clearStaffPortalSession();
+    setStaffSession(null);
     const portalSession = createTeacherPortalSession(account);
     setTeacherSession(portalSession);
   };
@@ -692,6 +773,33 @@ export default function App() {
     clearTeacherPortalSession();
     setTeacherSession(null);
     setTeacherView('dashboard');
+    setPreAuthView('onboarding');
+  };
+
+  const handleCreateStaffAccount = (account: StaffAccount) => {
+    const next = [...staffAccounts, account];
+    setStaffAccounts(next);
+    dbSet('samdani_staff_accounts', next);
+  };
+
+  const handleStaffLogin = (session: StaffPortalSession) => {
+    const accountsFromDb: StaffAccount[] = dbGet('samdani_staff_accounts') ?? [];
+    const account = staffAccounts.find((item) => item.id === session.accountId) ??
+      accountsFromDb.find((item) => item.id === session.accountId);
+    if (!account) {
+      alert('This staff account could not be found. Please try again.');
+      return;
+    }
+    clearTeacherPortalSession();
+    setTeacherSession(null);
+    const portalSession = createStaffPortalSession(account);
+    setStaffSession(portalSession);
+    persistStaffPortalSession(portalSession);
+  };
+
+  const handleStaffLogout = () => {
+    clearStaffPortalSession();
+    setStaffSession(null);
     setPreAuthView('onboarding');
   };
 
@@ -725,6 +833,51 @@ export default function App() {
       message: `${acc.fullName} is now part of the staff roster`,
     });
     alert(`Teacher ${acc.fullName} has been verified and registered successfully.`);
+  };
+
+  const handleRegisterStaffAccount = (accountId: string, monthlySalary: number) => {
+    if (!Number.isFinite(monthlySalary) || monthlySalary <= 0) {
+      alert('Enter a valid monthly salary greater than zero.');
+      return;
+    }
+    const account = staffAccounts.find((item) => item.id === accountId);
+    if (!account) {
+      alert('Unable to verify staff account. Please reload and try again.');
+      return;
+    }
+    const existing = teachersStaff.find((item) =>
+      item.role === 'Staff' && item.email.toLowerCase() === account.email.toLowerCase()
+    );
+    if (existing) {
+      setStaffAccounts((previous) => previous.map((item) => item.id === account.id ? { ...item, status: 'approved' } : item));
+      alert(`${account.fullName} has been approved for the staff portal.`);
+      return;
+    }
+    const rosterEntry: TeacherStaff = {
+      id: `STF-${Date.now().toString(36).toUpperCase()}`,
+      name: account.fullName,
+      role: 'Staff',
+      designation: account.role,
+      baseSalary: monthlySalary,
+      contact: account.phone,
+      email: account.email,
+      bio: account.bio,
+      joinedAt: account.createdAt,
+    };
+    setTeachersStaff((previous) => [...previous, rosterEntry]);
+    setStaffAccounts((previous) => previous.map((item) => item.id === account.id ? { ...item, status: 'approved' } : item));
+    alert(`${account.fullName} has been linked to the staff salary roster.`);
+  };
+
+  const handleApproveStaffAccount = (accountId: string) => {
+    const account = staffAccounts.find((item) => item.id === accountId);
+    if (!account) {
+      alert('Unable to find this staff account. Please refresh and try again.');
+      return;
+    }
+    setStaffAccounts((previous) => previous.map((item) =>
+      item.id === accountId ? { ...item, status: 'approved' } : item
+    ));
   };
 
   // Reject a pending teacher account (with a reason shown on their portal)
@@ -849,9 +1002,10 @@ export default function App() {
     setTeacherLeaves((prev) => [...prev, newLeave]);
     const leaveTeacher =
       teachersStaff.find((s) => s.id === entry.teacherId) ||
-      teacherAccounts.find((a) => a.id === entry.teacherId);
+      teacherAccounts.find((a) => a.id === entry.teacherId) ||
+      staffAccounts.find((a) => a.id === entry.teacherId);
     const leaveName = leaveTeacher
-      ? ('name' in leaveTeacher ? leaveTeacher.name : (leaveTeacher as any).fullName)
+      ? ('name' in leaveTeacher ? leaveTeacher.name : leaveTeacher.fullName)
       : 'A teacher';
     pushNotification({
       type: 'leave',
@@ -874,6 +1028,9 @@ export default function App() {
     const teacher = leave
       ? teacherAccounts.find((account) => account.id === leave.teacherId)
       : undefined;
+    const staff = leave
+      ? staffAccounts.find((account) => account.id === leave.teacherId)
+      : undefined;
     setTeacherLeaves((prev) => prev.map((leave) => (
       leave.id === id
         ? { ...leave, status, adminNote: adminNote?.trim() || undefined, decidedAt: new Date().toISOString() }
@@ -883,7 +1040,7 @@ export default function App() {
       pushNotification({
         type: 'leave',
         title: `Leave ${status}`,
-        message: `${teacher?.fullName || 'Teacher'}'s leave request was ${status}.`,
+        message: `${teacher?.fullName || staff?.fullName || 'Staff member'}'s leave request was ${status}.`,
       });
     }
   };
@@ -1301,6 +1458,9 @@ export default function App() {
     // Teacher already signed in → teacher dashboard
     if (teacherSession) {
       const currentAccount = teacherAccounts.find(a => a.id === teacherSession.accountId);
+      if (currentAccount && accountIsNonTeachingStaff(currentAccount)) {
+        return <div className="min-h-screen flex items-center justify-center bg-[#f8f7f4] text-sm font-semibold text-stone-600">Opening Staff Portal… (স্টাফ পোর্টাল খোলা হচ্ছে)</div>;
+      }
       const currentStaff = currentAccount
         ? teachersStaff.find((s) =>
             (currentAccount.email && s.email && s.email.toLowerCase() === currentAccount.email.toLowerCase()) ||
@@ -1325,7 +1485,7 @@ export default function App() {
           leaves={teacherLeaves}
           salaryPayments={salaryPayments}
           allTeachers={teacherAccounts
-            .filter((a) => a.registered)
+            .filter((a) => a.registered && !accountIsNonTeachingStaff(a))
             .map((a) => ({ id: a.id, fullName: a.fullName, designation: a.designation, photoUrl: a.photoUrl, role: a.role, email: a.email }))}
           students={students}
           academicClasses={academicClasses}
@@ -1352,6 +1512,27 @@ export default function App() {
           )}
         </>
       );
+    }
+    if (staffSession) {
+      const currentStaffAccount = staffAccounts.find((account) => account.id === staffSession.accountId);
+      if (currentStaffAccount) {
+        const staffRecord = teachersStaff.find((staff) =>
+          staff.role === 'Staff' && staff.email.toLowerCase() === currentStaffAccount.email.toLowerCase()
+        );
+        return (
+          <StaffDashboard
+            account={currentStaffAccount}
+            staffRecord={staffRecord}
+            salaryPayments={salaryPayments}
+            leaves={teacherLeaves}
+            qrSet={attendanceQRSet}
+            attendanceRecords={attendanceRecords}
+            onScan={(raw) => handleAttendanceScan(currentStaffAccount.id, currentStaffAccount.fullName, raw)}
+            onRequestLeave={handleAddTeacherLeave}
+            onLogout={handleStaffLogout}
+          />
+        );
+      }
     }
     // Admin role selection (Admin vs Viewer Admin) — shown after "I am Admin"
     if (preAuthView === 'adminRole') {
@@ -1387,10 +1568,21 @@ export default function App() {
         />
       );
     }
+    if (preAuthView === 'staffAuth') {
+      return (
+        <StaffAuth
+          accounts={staffAccounts}
+          onCreateAccount={handleCreateStaffAccount}
+          onLogin={handleStaffLogin}
+          onBack={() => setPreAuthView('onboarding')}
+        />
+      );
+    }
     // Default: onboarding / welcome screen
     return (
       <Onboarding
         onSelectTeacher={() => setPreAuthView('teacherAuth')}
+        onSelectStaff={() => setPreAuthView('staffAuth')}
         onSelectAdmin={() => setPreAuthView('adminRole')}
       />
     );
@@ -1474,6 +1666,7 @@ export default function App() {
           <AppManagementPage
             readOnly={adminReadOnly}
             teacherAccounts={teacherAccounts}
+            staffAccounts={staffAccounts}
             adminName={adminName}
           />
         )}
@@ -1494,12 +1687,14 @@ export default function App() {
             salaryPayments={salaryPayments}
             paymentMethods={paymentMethods}
             teacherAccounts={teacherAccounts}
+            staffAccounts={staffAccounts}
             onUpdateTeacherProfile={handleUpdateTeacherProfile}
             teacherRoutines={teacherRoutines}
             onDeleteTeacherStaff={handleDeleteTeacherStaff}
             onPaySalary={handlePaySalary}
             onDeleteSalaryPayment={handleDeleteSalaryPayment}
             onRegisterTeacherAccount={handleRegisterTeacherAccount}
+            onRegisterStaffAccount={handleRegisterStaffAccount}
             onRejectTeacherAccount={handleRejectTeacherAccount}
             onAddTeacherRoutine={handleAddTeacherRoutine}
             onDeleteTeacherRoutine={handleDeleteTeacherRoutine}
@@ -1511,6 +1706,37 @@ export default function App() {
             onAdminDeleteTeacher={handleAdminDeleteTeacher}
             attendanceQRSet={attendanceQRSet}
             attendanceRecords={attendanceRecords}
+            readOnly={adminReadOnly}
+          />
+        )}
+
+        {activeTab === 'staffManagement' && (
+          <SalariesModule
+            teachersStaff={teachersStaff}
+            salaryPayments={salaryPayments}
+            paymentMethods={paymentMethods}
+            teacherAccounts={teacherAccounts}
+            staffAccounts={staffAccounts}
+            onUpdateTeacherProfile={handleUpdateTeacherProfile}
+            teacherRoutines={teacherRoutines}
+            onDeleteTeacherStaff={handleDeleteTeacherStaff}
+            onPaySalary={handlePaySalary}
+            onDeleteSalaryPayment={handleDeleteSalaryPayment}
+            onRegisterTeacherAccount={handleRegisterTeacherAccount}
+            onRegisterStaffAccount={handleRegisterStaffAccount}
+            onRejectTeacherAccount={handleRejectTeacherAccount}
+            onAddTeacherRoutine={handleAddTeacherRoutine}
+            onDeleteTeacherRoutine={handleDeleteTeacherRoutine}
+            teacherLeaves={teacherLeaves}
+            onAddTeacherLeave={handleAddTeacherLeave}
+            onDeleteTeacherLeave={handleDeleteTeacherLeave}
+            onDecideTeacherLeave={handleDecideTeacherLeave}
+            onRefreshTeacherLeaves={handleRefreshTeacherLeaves}
+            onAdminDeleteTeacher={handleAdminDeleteTeacher}
+            attendanceQRSet={attendanceQRSet}
+            attendanceRecords={attendanceRecords}
+            onApproveStaffAccount={handleApproveStaffAccount}
+            staffOnly
             readOnly={adminReadOnly}
           />
         )}

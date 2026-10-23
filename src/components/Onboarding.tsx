@@ -4,11 +4,12 @@ import { GraduationCap, UserCog, Users, Loader2, ChevronRight } from 'lucide-rea
 
 interface OnboardingProps {
   onSelectTeacher: () => void;
+  onSelectStaff: () => void;
   onSelectAdmin: () => void;
 }
 
-export default function Onboarding({ onSelectTeacher, onSelectAdmin }: OnboardingProps) {
-  const [loadingRole, setLoadingRole] = useState<'teacher' | null>(null);
+export default function Onboarding({ onSelectTeacher, onSelectStaff, onSelectAdmin }: OnboardingProps) {
+  const [loadingRole, setLoadingRole] = useState<'teacher' | 'staff' | null>(null);
 
   const handleTeacher = () => {
     setLoadingRole('teacher');
@@ -16,6 +17,14 @@ export default function Onboarding({ onSelectTeacher, onSelectAdmin }: Onboardin
       setLoadingRole(null);
       onSelectTeacher();
     }, 850);
+  };
+
+  const handleStaff = () => {
+    setLoadingRole('staff');
+    setTimeout(() => {
+      setLoadingRole(null);
+      onSelectStaff();
+    }, 400);
   };
 
   return (
@@ -91,9 +100,9 @@ export default function Onboarding({ onSelectTeacher, onSelectAdmin }: Onboardin
           </button>
 
           <button
-            disabled
-            title="Coming soon"
-            className="w-full flex items-center justify-between gap-3 bg-stone-100 text-stone-400 rounded-xl px-4 py-3.5 border border-stone-200 cursor-not-allowed opacity-60"
+            onClick={handleStaff}
+            disabled={loadingRole === 'staff'}
+            className="group w-full flex items-center justify-between gap-3 bg-white hover:bg-stone-50 active:scale-[0.98] text-[#2c332d] rounded-xl px-4 py-3.5 shadow-sm border border-stone-200 transition-all cursor-pointer disabled:opacity-70"
           >
             <span className="flex items-center gap-3">
               <span className="p-2 rounded-lg bg-stone-200">
@@ -101,12 +110,10 @@ export default function Onboarding({ onSelectTeacher, onSelectAdmin }: Onboardin
               </span>
               <span className="text-left">
                 <span className="block text-sm font-semibold">I am Staff</span>
-                <span className="block text-[10px] text-stone-400">আমি স্টাফ (প্রতিষ্ঠিত নয়)</span>
+                <span className="block text-[10px] text-stone-500">স্টাফ পোর্টাল</span>
               </span>
             </span>
-            <span className="text-[9px] font-bold uppercase bg-stone-200 text-stone-500 px-2 py-1 rounded-full">
-              Soon
-            </span>
+            {loadingRole === 'staff' ? <Loader2 className="h-5 w-5 animate-spin text-[#4a5d4e]" /> : <ChevronRight className="h-5 w-5 text-stone-300 group-hover:translate-x-0.5 transition-transform" />}
           </button>
         </div>
 

@@ -17,13 +17,14 @@ interface AttendanceReportTabProps {
   teachers: TeacherLite[];
   records: AttendanceRecord[];
   qrSet: AttendanceQRSet | null;
+  peopleLabel?: string;
 }
 
 function fmtTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-export default function AttendanceReportTab({ teachers, records, qrSet }: AttendanceReportTabProps) {
+export default function AttendanceReportTab({ teachers, records, qrSet, peopleLabel = 'Teachers' }: AttendanceReportTabProps) {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -64,7 +65,7 @@ export default function AttendanceReportTab({ teachers, records, qrSet }: Attend
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white rounded-lg border border-stone-200 p-3 shadow-sm">
-          <span className="text-[9px] text-stone-400 font-bold uppercase block">Teachers (শিক্ষক)</span>
+          <span className="text-[9px] text-stone-400 font-bold uppercase block">{peopleLabel} ({peopleLabel === 'Staff' ? 'স্টাফ' : 'শিক্ষক'})</span>
           <span className="text-lg font-black text-[#2c332d] font-mono">{summary.total}</span>
         </div>
         <div className="bg-emerald-50 rounded-lg border border-emerald-200 p-3 shadow-sm">
@@ -86,7 +87,7 @@ export default function AttendanceReportTab({ teachers, records, qrSet }: Attend
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-stone-400" />
         <input
           type="text"
-          placeholder="Search teacher by name or designation..."
+          placeholder={`Search ${peopleLabel.toLowerCase()} by name or designation...`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="w-full bg-white text-xs border border-stone-200 rounded-lg pl-9 pr-3 py-2 focus:outline-none focus:border-[#4a5d4e]"
@@ -96,7 +97,7 @@ export default function AttendanceReportTab({ teachers, records, qrSet }: Attend
       {visible.length === 0 ? (
         <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-10 text-center flex flex-col items-center justify-center gap-2">
           <Users className="h-7 w-7 text-stone-300" />
-          <p className="text-xs font-bold text-stone-500">No teachers found</p>
+          <p className="text-xs font-bold text-stone-500">No {peopleLabel.toLowerCase()} found</p>
         </div>
       ) : (
         visible.map((t) => {

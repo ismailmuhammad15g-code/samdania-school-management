@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { TeacherStaff, SalaryPayment, MONTHS, TeacherAccount, TeacherRoutine, TeacherLeave, AttendanceQRSet, AttendanceRecord } from '../types';
+import { TeacherStaff, SalaryPayment, MONTHS, TeacherAccount, StaffAccount, TeacherRoutine, TeacherLeave, AttendanceQRSet, AttendanceRecord } from '../types';
 import { TeacherAvatar, PhotoLightbox } from './TeacherPhoto';
 import AttendanceReportTab from './AttendanceReportTab';
 import PasswordConfirmModal from './PasswordConfirmModal';
@@ -33,15 +33,22 @@ import {
   RefreshCw
 } from 'lucide-react';
 
+const isNonTeachingPortalAccount = (account: TeacherAccount): boolean =>
+  /\b(staff|driver|cleaner|guard|security|accountant|cook|caretaker|peon|janitor|maintenance|office)\b/i
+    .test(`${account.role || ''} ${account.designation || ''}`);
+
 interface SalariesModuleProps {
   teachersStaff: TeacherStaff[];
   salaryPayments: SalaryPayment[];
   paymentMethods: string[];
   teacherAccounts: TeacherAccount[];
+  staffAccounts: StaffAccount[];
   onDeleteTeacherStaff: (id: string) => void;
   onPaySalary: (payment: Omit<SalaryPayment, 'id' | 'recordedBy'>) => void;
   onDeleteSalaryPayment: (id: string) => void;
   onRegisterTeacherAccount: (accountId: string, monthlySalary: number) => void;
+  onRegisterStaffAccount: (accountId: string, monthlySalary: number) => void;
+  onApproveStaffAccount?: (accountId: string) => void;
   onRejectTeacherAccount: (accountId: string, reason: string) => void;
   teacherRoutines: TeacherRoutine[];
   onAddTeacherRoutine: (entry: Omit<TeacherRoutine, 'id'>) => void;
@@ -56,17 +63,21 @@ interface SalariesModuleProps {
   attendanceQRSet: AttendanceQRSet | null;
   attendanceRecords: AttendanceRecord[];
   readOnly?: boolean;
+  staffOnly?: boolean;
 }
 
-export default function SalariesModule({
+function SalariesModuleContent({
   teachersStaff,
   salaryPayments,
   paymentMethods,
   teacherAccounts,
+  staffAccounts,
   onDeleteTeacherStaff,
   onPaySalary,
   onDeleteSalaryPayment,
   onRegisterTeacherAccount,
+  onRegisterStaffAccount,
+  onApproveStaffAccount = () => {},
   onRejectTeacherAccount,
   teacherRoutines,
   onAddTeacherRoutine,
@@ -80,7 +91,8 @@ export default function SalariesModule({
   onUpdateTeacherProfile,
   attendanceQRSet,
   attendanceRecords,
-  readOnly
+  readOnly,
+  staffOnly = false,
 }: SalariesModuleProps) {
   const [activeTab, setActiveTab] = useState<'roster' | 'ledger' | 'unpaid' | 'disburse' | 'pendingreg' | 'teacheroverview' | 'teacherdetails' | 'attendance'>('roster');
   const [profileTeacher, setProfileTeacher] = useState<TeacherAccount | null>(null);
@@ -97,6 +109,7 @@ export default function SalariesModule({
   const [regAccount, setRegAccount] = useState<TeacherAccount | null>(null);
   const [regSalary, setRegSalary] = useState('');
   const [regError, setRegError] = useState('');
+  const [staffSalaryDrafts, setStaffSalaryDrafts] = useState<Record<string, string>>({});
 
   // Reject teacher-account registration (with reason)
   const [rejectAccount, setRejectAccount] = useState<TeacherAccount | null>(null);
@@ -133,13 +146,17 @@ export default function SalariesModule({
   };
 
   const pendingAccounts = useMemo(
-    () => teacherAccounts.filter((a) => !a.registered && a.status !== 'rejected'),
+    () => teacherAccounts.filter((a) => !isNonTeachingPortalAccount(a) && !a.registered && a.status !== 'rejected'),
     [teacherAccounts]
   );
 
   // Only verified (registered) teacher accounts appear in Teachers Details
   const verifiedTeachers = useMemo(
-    () => teacherAccounts.filter((a) => a.registered),
+    () => teacherAccounts.filter((a) => !isNonTeachingPortalAccount(a) && a.registered),
+    [teacherAccounts]
+  );
+  const portalTeacherAccounts = useMemo(
+    () => teacherAccounts.filter((account) => !isNonTeachingPortalAccount(account)),
     [teacherAccounts]
   );
 
@@ -355,10 +372,12 @@ export default function SalariesModule({
         <div>
           <h2 className="text-xl font-serif font-bold text-[#2c332d] tracking-tight flex items-center gap-2">
             <Building2 className="h-5 w-5 text-[#4a5d4e]" />
-            Salary Disbursement (বেতন প্রদান)
+            {staffOnly ? 'Staff Management (স্টাফ ব্যবস্থাপনা)' : 'Teacher Salary Disbursement (শিক্ষক বেতন প্রদান)'}
           </h2>
           <p className="text-xs text-stone-500 mt-1">
-            Teachers create their own accounts from the portal. Approve pending registrations below to add them to the roster.
+            {staffOnly
+              ? 'Approve staff portal accounts, manage the staff roster, review leave requests, and distribute staff salaries.'
+              : 'Teachers create their own accounts from the portal. Approve pending registrations below to add them to the roster.'}
           </p>
         </div>
       </div>
@@ -391,11 +410,13 @@ export default function SalariesModule({
           { id: 'roster' as const, icon: <Briefcase className="h-3.5 w-3.5" />, label: 'Roster (তালিকা)', count: teachersStaff.length },
           { id: 'ledger' as const, icon: <Receipt className="h-3.5 w-3.5" />, label: 'Disbursement Ledger (হিসাব)', count: salaryPayments.length },
           { id: 'unpaid' as const, icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Pending (বকেয়া)', count: pendingStaff.length },
-          { id: 'pendingreg' as const, icon: <UserPlus className="h-3.5 w-3.5" />, label: 'Pending Reg (নিবন্ধন)', count: pendingAccounts.length },
-          { id: 'teacheroverview' as const, icon: <User className="h-3.5 w-3.5" />, label: 'Teacher Overview', count: verifiedTeachers.length },
-          { id: 'teacherdetails' as const, icon: <Users className="h-3.5 w-3.5" />, label: 'Teachers Details (শিক্ষক বিবরণ)', count: verifiedTeachers.length },
-          { id: 'attendance' as const, icon: <CalendarCheck className="h-3.5 w-3.5" />, label: 'Attendance (উপস্থিতি)', count: attendanceRecords.filter((r) => r.date === (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; })()).length },
-        ].map(tab => (
+          { id: 'pendingreg' as const, icon: <UserPlus className="h-3.5 w-3.5" />, label: staffOnly ? 'Staff Approval (স্টাফ অনুমোদন)' : 'Pending Reg (নিবন্ধন)', count: staffOnly ? staffAccounts.filter((account) => account.status !== 'approved').length : pendingAccounts.length },
+          ...(!staffOnly ? [
+            { id: 'teacheroverview' as const, icon: <User className="h-3.5 w-3.5" />, label: 'Teacher Overview', count: verifiedTeachers.length },
+            { id: 'teacherdetails' as const, icon: <Users className="h-3.5 w-3.5" />, label: 'Teachers Details (শিক্ষক বিবরণ)', count: verifiedTeachers.length },
+          ] : []),
+          { id: 'attendance' as const, icon: <CalendarCheck className="h-3.5 w-3.5" />, label: 'Leave & Attendance (ছুটি ও উপস্থিতি)', count: teacherLeaves.filter((leave) => leave.status === 'pending').length + attendanceRecords.filter((r) => r.date === (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; })()).length },
+        ].filter((tab) => !staffOnly || ['roster', 'ledger', 'unpaid', 'pendingreg', 'attendance'].includes(tab.id)).map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
@@ -592,7 +613,7 @@ export default function SalariesModule({
                     <td colSpan={7} className="py-12 text-center">
                       <Send className="h-8 w-8 text-stone-200 mx-auto mb-2" />
                       <p className="text-stone-500 italic">No disbursements recorded yet.</p>
-                      <p className="text-[10px] text-stone-400 mt-1">Go to Roster → click Disburse to send salary to a teacher.</p>
+                      <p className="text-[10px] text-stone-400 mt-1">Go to Roster → click Disburse to send the salary.</p>
                     </td>
                   </tr>
                 ) : (
@@ -653,7 +674,7 @@ export default function SalariesModule({
                 {teachersStaff.length === 0 ? (
                   <>
                     <Briefcase className="h-12 w-12 text-stone-200 mx-auto mb-3" />
-                    <p className="text-sm font-bold text-stone-500">No teachers or staff registered yet.</p>
+                    <p className="text-sm font-bold text-stone-500">{staffOnly ? 'No staff registered yet.' : 'No teachers registered yet.'}</p>
                     <p className="text-xs text-stone-400 mt-1">Register staff first, then disburse their salary.</p>
                   </>
                 ) : (
@@ -715,7 +736,39 @@ export default function SalariesModule({
       {/* ===== TAB: PENDING REGISTRATION (teacher accounts from onboarding) ===== */}
       {activeTab === 'pendingreg' && (
         <div className="space-y-3">
-          {teacherAccounts.length === 0 ? (
+          {staffOnly && <section className="bg-white rounded-xl border border-stone-200 shadow-sm p-4 space-y-3">
+            <div>
+              <h3 className="text-sm font-bold text-[#2c332d]">Staff Accounts (স্টাফ অ্যাকাউন্ট)</h3>
+              <p className="text-[11px] text-stone-500 mt-1">Connect each staff portal account to the salary roster by setting their monthly salary.</p>
+            </div>
+            {staffAccounts.length === 0 ? <p className="text-xs text-stone-500">No staff portal accounts yet.</p> : staffAccounts.map((staffAccount) => {
+              const rosterEntry = teachersStaff.find((person) => person.role === 'Staff' && person.email.toLowerCase() === staffAccount.email.toLowerCase());
+              return (
+                <div key={staffAccount.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-stone-100 rounded-lg p-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-[#2c332d]">{staffAccount.fullName} · {staffAccount.role}</p>
+                    <p className="text-[10px] text-stone-500">{staffAccount.email}{staffAccount.phone ? ` · ${staffAccount.phone}` : ''}</p>
+                    {rosterEntry && <p className="text-[10px] font-semibold text-emerald-700 mt-1">Salary roster linked · ৳{rosterEntry.baseSalary.toLocaleString()} / month</p>}
+                  </div>
+                  {!readOnly && staffAccount.status !== 'approved' && <button type="button" onClick={() => onApproveStaffAccount(staffAccount.id)} className="bg-emerald-600 text-white text-[10px] font-bold px-3 py-2 rounded-lg">Approve Portal (পোর্টাল অনুমোদন)</button>}
+                  {!readOnly && !rosterEntry && <div className="flex items-center gap-2">
+                    <label className="text-[10px] font-bold text-stone-500">Monthly salary (মাসিক বেতন)
+                      <input inputMode="decimal" value={staffSalaryDrafts[staffAccount.id] || ''} onChange={(event) => setStaffSalaryDrafts((prev) => ({ ...prev, [staffAccount.id]: event.target.value }))} className="block w-36 mt-1 border border-stone-200 rounded-lg px-2.5 py-2 text-xs" placeholder="৳" />
+                    </label>
+                    <button type="button" onClick={() => {
+                      const amount = parseNumberWithBengaliSupport(staffSalaryDrafts[staffAccount.id] || '');
+                      if (!Number.isFinite(amount) || amount <= 0) {
+                        alert('Enter a monthly salary greater than zero.');
+                        return;
+                      }
+                      onRegisterStaffAccount(staffAccount.id, amount);
+                    }} className="bg-emerald-600 text-white text-[10px] font-bold px-3 py-2 rounded-lg">Link salary (বেতন যুক্ত)</button>
+                  </div>}
+                </div>
+              );
+            })}
+          </section>}
+          {!staffOnly && (portalTeacherAccounts.length === 0 ? (
             <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-10 text-center flex flex-col items-center justify-center gap-2">
               <UserPlus className="h-7 w-7 text-stone-300" />
               <p className="text-xs font-bold text-stone-500">No teacher accounts found</p>
@@ -724,7 +777,7 @@ export default function SalariesModule({
               </p>
             </div>
           ) : (
-            teacherAccounts
+            portalTeacherAccounts
               .slice()
               .sort((a, b) => Number(a.registered) - Number(b.registered))
               .map((a) => (
@@ -783,7 +836,7 @@ export default function SalariesModule({
                   </div>
                 </div>
               ))
-          )}
+          ))}
         </div>
       )}
 
@@ -924,7 +977,7 @@ export default function SalariesModule({
         <div className="space-y-5">
           <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
             <div className="bg-indigo-50 border-b border-indigo-100 px-4 py-3">
-              <h3 className="text-sm font-serif font-bold text-indigo-900">Leave Requests (ছুটির আবেদন)</h3>
+              <h3 className="text-sm font-serif font-bold text-indigo-900">{staffOnly ? 'Staff Leave Requests (স্টাফ ছুটির আবেদন)' : 'Teacher Leave Requests (শিক্ষকের ছুটির আবেদন)'}</h3>
               <p className="text-[11px] text-indigo-700 mt-0.5">Approve or deny requests. Only administrators can remove an approved leave.</p>
             </div>
             <div className="p-4 space-y-3">
@@ -933,13 +986,15 @@ export default function SalariesModule({
               ) : (
                 teacherLeaves.filter((leave) => leave.status === 'pending').map((leave) => {
                   const teacher = teacherAccounts.find((account) => account.id === leave.teacherId);
+                  const staff = staffAccounts.find((account) => account.id === leave.teacherId);
                   return (
                     <div key={leave.id} className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 space-y-2">
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                         <div>
-                          <p className="text-xs font-bold text-[#2c332d]">{teacher?.fullName || 'Unknown teacher'}</p>
+                          <p className="text-xs font-bold text-[#2c332d]">{teacher?.fullName || staff?.fullName || 'Unknown staff member'}</p>
+                          {staff && <p className="text-[10px] text-stone-500">Staff · {staff.role}</p>}
                           <p className="text-[11px] text-stone-600">{leave.startDate} → {leave.endDate}</p>
-                          {leave.notes && <p className="text-[11px] text-stone-600 mt-1">Teacher note: {leave.notes}</p>}
+                          {leave.notes && <p className="text-[11px] text-stone-600 mt-1">{staffOnly ? 'Staff' : 'Teacher'} note: {leave.notes}</p>}
                         </div>
                         <span className="text-[10px] font-bold text-indigo-700">Pending confirmation</span>
                       </div>
@@ -1007,10 +1062,11 @@ export default function SalariesModule({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="text-[10px] font-bold text-stone-500">
-                  Teacher
+                  {staffOnly ? 'Staff (স্টাফ)' : 'Teacher (শিক্ষক)'}
                   <select value={leaveHistoryTeacher} onChange={(e) => setLeaveHistoryTeacher(e.target.value)} className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs">
-                    <option value="all">All teachers</option>
+                    <option value="all">{staffOnly ? 'All staff' : 'All teachers'}</option>
                     {verifiedTeachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}
+                    {staffAccounts.map((staff) => <option key={staff.id} value={staff.id}>{staff.fullName} · {staff.role}</option>)}
                   </select>
                 </label>
                 <label className="text-[10px] font-bold text-stone-500">
@@ -1029,13 +1085,15 @@ export default function SalariesModule({
                 <div className="space-y-2">
                   {leaveHistory.map((leave) => {
                     const teacher = teacherAccounts.find((account) => account.id === leave.teacherId);
+                    const staff = staffAccounts.find((account) => account.id === leave.teacherId);
                     const status = leave.status || 'approved';
                     const current = activeLeaveFor(leave.teacherId)?.id === leave.id;
                     return (
                       <div key={leave.id} className="rounded-xl border border-stone-200 p-3 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-xs font-bold text-[#2c332d]">{teacher?.fullName || 'Unknown teacher'}</p>
+                            <p className="text-xs font-bold text-[#2c332d]">{teacher?.fullName || staff?.fullName || 'Unknown staff member'}</p>
+                            {staff && <span className="text-[9px] text-stone-500">Staff · {staff.role}</span>}
                             <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
                               status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
                               status === 'pending' ? 'bg-sky-100 text-sky-700' : 'bg-red-100 text-red-700'
@@ -1043,7 +1101,7 @@ export default function SalariesModule({
                             {current && <span className="rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[9px] font-bold">Currently on leave</span>}
                           </div>
                           <p className="text-[11px] text-stone-600 mt-1">{leave.startDate} → {leave.endDate} · {leaveDays(leave)} day(s)</p>
-                          {leave.notes && <p className="text-[10px] text-stone-500 mt-1">Teacher note: {leave.notes}</p>}
+                          {leave.notes && <p className="text-[10px] text-stone-500 mt-1">{staffOnly ? 'Staff' : 'Teacher'} note: {leave.notes}</p>}
                           {leave.adminNote && <p className="text-[10px] text-stone-500 mt-1">Admin note: {leave.adminNote}</p>}
                         </div>
                         {!readOnly && (status === 'approved' || current) && (
@@ -1063,16 +1121,26 @@ export default function SalariesModule({
             </div>
           </div>
           <AttendanceReportTab
-            teachers={verifiedTeachers.map((a) => ({
-              id: a.id,
-              fullName: a.fullName,
-              designation: a.designation,
-              photoUrl: a.photoUrl,
-              role: a.role,
-              email: a.email,
-            }))}
+            teachers={staffOnly
+              ? staffAccounts.filter((account) => account.status === 'approved').map((account) => ({
+                  id: account.id,
+                  fullName: account.fullName,
+                  designation: account.role,
+                  photoUrl: account.photoUrl,
+                  role: 'Staff',
+                  email: account.email,
+                }))
+              : verifiedTeachers.map((account) => ({
+                  id: account.id,
+                  fullName: account.fullName,
+                  designation: account.designation,
+                  photoUrl: account.photoUrl,
+                  role: account.role,
+                  email: account.email,
+                }))}
             records={attendanceRecords}
             qrSet={attendanceQRSet}
+            peopleLabel={staffOnly ? 'Staff' : 'Teachers'}
           />
         </div>
       )}
@@ -1665,5 +1733,49 @@ export default function SalariesModule({
       <PhotoLightbox src={lightbox.src} name={lightbox.name} onClose={() => setLightbox(null)} />
     )}
     </>
+  );
+}
+
+export default function SalariesModule(props: SalariesModuleProps) {
+  const staffRoster = props.teachersStaff.filter((record) => record.role === 'Staff');
+  const teacherRoster = props.teachersStaff.filter((record) => record.role === 'Teacher');
+  const staffIds = new Set([
+    ...staffRoster.map((record) => record.id),
+    ...props.staffAccounts.map((account) => account.id),
+  ]);
+  const rosterIds = new Set(staffRoster.map((record) => record.id));
+  const staffAttendance = props.attendanceRecords.filter((record) => staffIds.has(record.teacherId));
+
+  if (!props.staffOnly) {
+    const teacherAccounts = props.teacherAccounts.filter((account) => !isNonTeachingPortalAccount(account));
+    const teacherIds = new Set(teacherAccounts.map((account) => account.id));
+    const teacherRosterIds = new Set(teacherRoster.map((record) => record.id));
+    return (
+      <SalariesModuleContent
+        {...props}
+        teachersStaff={teacherRoster}
+        salaryPayments={props.salaryPayments.filter((payment) => teacherRosterIds.has(payment.teacherStaffId))}
+        teacherAccounts={teacherAccounts}
+        staffAccounts={[]}
+        teacherLeaves={props.teacherLeaves.filter((leave) => teacherIds.has(leave.teacherId))}
+        attendanceRecords={props.attendanceRecords.filter((record) => teacherIds.has(record.teacherId))}
+        staffOnly={false}
+      />
+    );
+  }
+
+  return (
+    <SalariesModuleContent
+      {...props}
+      teachersStaff={staffRoster}
+      salaryPayments={props.salaryPayments.filter((payment) => rosterIds.has(payment.teacherStaffId))}
+      teacherAccounts={[]}
+      teacherRoutines={[]}
+      teacherLeaves={props.teacherLeaves.filter((leave) => staffIds.has(leave.teacherId))}
+      attendanceRecords={staffAttendance}
+      onAdminDeleteTeacher={() => {}}
+      onUpdateTeacherProfile={() => {}}
+      staffOnly
+    />
   );
 }

@@ -39,6 +39,7 @@ const NAV_ITEMS = [
   { id: 'finance', label: 'Finance', icon: DollarSign },
   { id: 'fees', label: 'Students', icon: Users },
   { id: 'salaries', label: 'Teachers (শিক্ষক)', icon: Wallet },
+  { id: 'staffManagement', label: 'Staff (স্টাফ)', icon: Users },
   { id: 'results', label: 'Results', icon: GraduationCap },
   { id: 'loans', label: 'Loans', icon: PiggyBank },
   { id: 'settings', label: 'Settings', icon: Settings },

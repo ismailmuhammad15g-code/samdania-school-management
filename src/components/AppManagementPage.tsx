@@ -4,6 +4,12 @@ import { dbGet, dbSet, onDbChange } from '../lib/localDb';
 import { Student } from '../types';
 import { getTeacherNotices, saveTeacherNotices, type TeacherNotice } from '../lib/teacherNotices';
 import { TeacherAccount } from '../types';
+import { getStaffNotices, saveStaffNotices, type StaffNotice } from '../lib/staffNotices';
+import { StaffAccount } from '../types';
+
+const isNonTeachingPortalAccount = (account: TeacherAccount): boolean =>
+  /\b(staff|driver|cleaner|guard|security|accountant|cook|caretaker|peon|janitor|maintenance|office)\b/i
+    .test(`${account.role || ''} ${account.designation || ''}`);
 
 type Notice = {
   id: string;
@@ -24,10 +30,11 @@ function readNotices(): Notice[] {
 interface AppManagementPageProps {
   readOnly?: boolean;
   teacherAccounts: TeacherAccount[];
+  staffAccounts: StaffAccount[];
   adminName: string;
 }
 
-export default function AppManagementPage({ readOnly = false, teacherAccounts, adminName }: AppManagementPageProps) {
+export default function AppManagementPage({ readOnly = false, teacherAccounts, staffAccounts, adminName }: AppManagementPageProps) {
   const [notices, setNotices] = useState<Notice[]>(readNotices);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -41,6 +48,11 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, a
   const [teacherNoticeTarget, setTeacherNoticeTarget] = useState<'all' | 'selected'>('all');
   const [teacherNoticeRecipients, setTeacherNoticeRecipients] = useState<string[]>([]);
   const [teacherNotices, setTeacherNotices] = useState<TeacherNotice[]>(getTeacherNotices);
+  const [staffNoticeTitle, setStaffNoticeTitle] = useState('');
+  const [staffNoticeMessage, setStaffNoticeMessage] = useState('');
+  const [staffNoticeTarget, setStaffNoticeTarget] = useState<'all' | 'selected'>('all');
+  const [staffNoticeRecipients, setStaffNoticeRecipients] = useState<string[]>([]);
+  const [staffNotices, setStaffNotices] = useState<StaffNotice[]>(getStaffNotices);
 
   useEffect(() => {
     const refresh = () => setNotices(readNotices());
@@ -49,6 +61,11 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, a
 
   useEffect(() => {
     const refresh = () => setTeacherNotices(getTeacherNotices());
+    return onDbChange(refresh);
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => setStaffNotices(getStaffNotices());
     return onDbChange(refresh);
   }, []);
 
@@ -127,6 +144,38 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, a
     setTeacherNotices(next);
   };
 
+  const sendStaffNotice = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!staffNoticeTitle.trim() || !staffNoticeMessage.trim()) return;
+    if (staffNoticeTarget === 'selected' && staffNoticeRecipients.length === 0) {
+      setMessage('Select at least one staff member for a targeted notice.');
+      return;
+    }
+    const notice: StaffNotice = {
+      id: `SNOTICE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: staffNoticeTitle.trim(),
+      message: staffNoticeMessage.trim(),
+      createdAt: new Date().toISOString(),
+      target: staffNoticeTarget,
+      recipientIds: staffNoticeTarget === 'all' ? [] : staffNoticeRecipients,
+      createdBy: adminName,
+    };
+    const next = [notice, ...staffNotices];
+    saveStaffNotices(next);
+    setStaffNotices(next);
+    setStaffNoticeTitle('');
+    setStaffNoticeMessage('');
+    setStaffNoticeTarget('all');
+    setStaffNoticeRecipients([]);
+    setMessage('Staff notice sent successfully. (স্টাফ নোটিশ পাঠানো হয়েছে)');
+  };
+
+  const removeStaffNotice = (id: string) => {
+    const next = staffNotices.filter((notice) => notice.id !== id);
+    saveStaffNotices(next);
+    setStaffNotices(next);
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div>
@@ -147,7 +196,7 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, a
           </div>
           {teacherNoticeTarget === 'selected' && (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-              {teacherAccounts.filter((account) => account.registered).map((account) => (
+              {teacherAccounts.filter((account) => account.registered && !isNonTeachingPortalAccount(account)).map((account) => (
                 <label key={account.id} className="flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs">
                   <input type="checkbox" checked={teacherNoticeRecipients.includes(account.id)} onChange={(e) => setTeacherNoticeRecipients((prev) => e.target.checked ? [...prev, account.id] : prev.filter((id) => id !== account.id))} />
                   {account.fullName}
@@ -157,6 +206,29 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, a
           )}
           <textarea value={teacherNoticeMessage} onChange={(e) => setTeacherNoticeMessage(e.target.value)} required placeholder="Notice message" className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm h-24" />
           <button className="bg-[#4a5d4e] text-white rounded-lg px-4 py-2 text-xs font-bold flex items-center gap-2"><Send className="h-4 w-4" /> Send to Teacher Portal</button>
+        </form>}
+        {!readOnly && <form onSubmit={sendStaffNotice} className="bg-white border border-stone-200 rounded-xl p-5 space-y-4 lg:col-span-2">
+          <div className="flex items-center gap-2"><Megaphone className="h-4 w-4 text-[#4a5d4e]" /><h3 className="font-bold text-sm">Staff Noticeboard (স্টাফ নোটিশ)</h3></div>
+          <div className="grid md:grid-cols-2 gap-3">
+            <input value={staffNoticeTitle} onChange={(e) => setStaffNoticeTitle(e.target.value)} required placeholder="Notice title (নোটিশের শিরোনাম)" className="border border-stone-200 rounded-lg px-3 py-2 text-sm" />
+            <select value={staffNoticeTarget} onChange={(e) => { setStaffNoticeTarget(e.target.value as 'all' | 'selected'); setStaffNoticeRecipients([]); }} className="border border-stone-200 rounded-lg px-3 py-2 text-sm">
+              <option value="all">Send to all staff (সকল স্টাফকে পাঠান)</option>
+              <option value="selected">Send to selected staff (নির্বাচিত স্টাফকে পাঠান)</option>
+            </select>
+          </div>
+          {staffNoticeTarget === 'selected' && (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {staffAccounts.map((account) => (
+                <label key={account.id} className="flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs">
+                  <input type="checkbox" checked={staffNoticeRecipients.includes(account.id)} onChange={(e) => setStaffNoticeRecipients((prev) => e.target.checked ? [...prev, account.id] : prev.filter((id) => id !== account.id))} />
+                  {account.fullName} · {account.role}
+                </label>
+              ))}
+              {staffAccounts.length === 0 && <p className="text-xs text-stone-500">No staff accounts are registered yet.</p>}
+            </div>
+          )}
+          <textarea value={staffNoticeMessage} onChange={(e) => setStaffNoticeMessage(e.target.value)} required placeholder="Notice message (নোটিশের বার্তা)" className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm h-24" />
+          <button className="bg-[#4a5d4e] text-white rounded-lg px-4 py-2 text-xs font-bold flex items-center gap-2"><Send className="h-4 w-4" /> Send to Staff Portal (স্টাফ পোর্টালে পাঠান)</button>
         </form>}
         {!readOnly && <form onSubmit={addNotice} className="bg-white border border-stone-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2"><Megaphone className="h-4 w-4 text-[#4a5d4e]" /><h3 className="font-bold text-sm">Create Notice</h3></div>
@@ -182,6 +254,16 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, a
           {teacherNotices.map((notice) => <article key={notice.id} className="border border-stone-200 rounded-lg p-3 flex items-start justify-between gap-4">
             <div><h4 className="text-sm font-bold">{notice.title}</h4><p className="text-xs text-stone-600 mt-1 whitespace-pre-wrap">{notice.message}</p><time className="text-[10px] text-stone-400">{new Date(notice.createdAt).toLocaleString()} · {notice.target === 'all' ? 'All teachers' : `${notice.recipientIds.length} teacher(s)`}</time></div>
             {!readOnly && <button title="Delete teacher notice" onClick={() => removeTeacherNotice(notice.id)} className="text-red-600 p-1"><Trash2 className="h-4 w-4" /></button>}
+          </article>)}
+        </div>
+      </section>
+      <section className="bg-white border border-stone-200 rounded-xl p-5">
+        <h3 className="font-bold text-sm mb-4">Staff Notices (স্টাফ নোটিশ)</h3>
+        <div className="space-y-3">
+          {staffNotices.length === 0 && <p className="text-xs text-stone-500">No staff notices have been sent. (কোনো স্টাফ নোটিশ পাঠানো হয়নি)</p>}
+          {staffNotices.map((notice) => <article key={notice.id} className="border border-stone-200 rounded-lg p-3 flex items-start justify-between gap-4">
+            <div><h4 className="text-sm font-bold">{notice.title}</h4><p className="text-xs text-stone-600 mt-1 whitespace-pre-wrap">{notice.message}</p><time className="text-[10px] text-stone-400">{new Date(notice.createdAt).toLocaleString()} · {notice.target === 'all' ? 'All staff' : `${notice.recipientIds.length} staff member(s)`}</time></div>
+            {!readOnly && <button title="Delete staff notice" onClick={() => removeStaffNotice(notice.id)} className="text-red-600 p-1"><Trash2 className="h-4 w-4" /></button>}
           </article>)}
         </div>
       </section>

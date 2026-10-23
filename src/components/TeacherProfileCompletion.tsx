@@ -48,7 +48,7 @@ interface TeacherProfileCompletionProps {
   onLater?: () => void;
 }
 
-const ROLE_OPTIONS = ['Teacher', 'Staff', 'Hifz Muallim', 'Quran Teacher', 'Admin'];
+const ROLE_OPTIONS = ['Teacher', 'Hifz Muallim', 'Quran Teacher'];
 
 export default function TeacherProfileCompletion({ account, onComplete, onLater }: TeacherProfileCompletionProps) {
   const [profPhoto, setProfPhoto] = useState<string | null>(null);
