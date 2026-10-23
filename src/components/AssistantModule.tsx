@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Send, Eraser, Sparkles, MessagesSquare } from 'lucide-react';
+import { Send, Eraser, Sparkles, MessagesSquare, Info } from 'lucide-react';
 import { groqChat, isAiConfigured, type GroqMessage } from '../lib/ai';
 import { buildSnapshot } from '../lib/aiContext';
 import { AGENT_TOOLS, executeTool, type AgentActions } from '../lib/aiTools';
@@ -31,6 +31,22 @@ const TOOL_LABELS: Record<string, string> = {
   record_fee_payment: 'Recording fee payment…',
   add_loan: 'Adding loan entry…',
 };
+
+function compactRequestMessages(messages: GroqMessage[]): GroqMessage[] {
+  const system = messages.find((message) => message.role === 'system');
+  const nonSystem = messages.filter((message) => message.role !== 'system');
+  const lastUserIndex = nonSystem.reduce((index, message, currentIndex) => message.role === 'user' ? currentIndex : index, -1);
+  const previous = nonSystem.slice(Math.max(0, lastUserIndex - 3), lastUserIndex);
+  const active = lastUserIndex >= 0 ? nonSystem.slice(lastUserIndex) : nonSystem.slice(-4);
+  const compact = (message: GroqMessage): GroqMessage => ({
+    ...message,
+    content: message.content == null ? null : message.content.slice(0, message.role === 'tool' ? 1800 : 1400),
+  });
+  return [
+    ...(system ? [{ ...system, content: system.content?.slice(0, 6500) ?? '' }] : []),
+    ...[...previous, ...active].map(compact).slice(-8),
+  ];
+}
 
 function askSystem(snapshot: string): string {
   return `You are "Samdania AI Assistant" — the intelligent assistant of Samdania Talimul Islam Madrasah management system (admin@madrasah.com panel). You have COMPLETE, LIVE, exact knowledge of the ENTIRE school database via the context below. You know every student, every invoice, every ledger entry, every teacher, salary, result, loan and attendance record down to the last detail — more precisely than any human.
@@ -67,6 +83,7 @@ export default function AssistantModule({ actions, readOnly }: AssistantModulePr
   const [toolActivity, setToolActivity] = useState('');
   const [configured] = useState(isAiConfigured());
   const [approval, setApproval] = useState<{ name: string; argumentsText: string } | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const busyRef = useRef(false);
   const approvalResolver = useRef<((approved: boolean) => void) | null>(null);
@@ -138,10 +155,10 @@ export default function AssistantModule({ actions, readOnly }: AssistantModulePr
         let guard = 0;
         while (guard++ < 8) {
           const resp = await groqChat({
-            messages: working,
+            messages: compactRequestMessages(working),
             tools: mode === 'agent' ? AGENT_TOOLS : undefined,
             temperature: 0.2,
-            maxTokens: 800,
+            maxTokens: 500,
           });
 
           if (resp.tool_calls && resp.tool_calls.length) {
@@ -262,6 +279,13 @@ export default function AssistantModule({ actions, readOnly }: AssistantModulePr
               </button>
             </div>
             <button
+              onClick={() => setShowHelp(true)}
+              title="AI help and troubleshooting"
+              className="p-2 rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-100 cursor-pointer"
+            >
+              <Info className="h-4 w-4" />
+            </button>
+            <button
               onClick={clearChat}
               title="Clear conversation"
               className="p-2 rounded-lg border border-neutral-200 text-neutral-500 hover:bg-neutral-100 cursor-pointer"
@@ -284,9 +308,8 @@ export default function AssistantModule({ actions, readOnly }: AssistantModulePr
             </span>
           ) : (
             <span>
-              <strong className="text-neutral-700">Agent Mode:</strong> the assistant reads &amp;
-              modifies data automatically — it verifies every field before acting, then performs the
-              change at once.
+              <strong className="text-neutral-700">Agent Mode:</strong> the assistant reads live data,
+              checks required fields, then waits for your <strong className="text-neutral-700">Approve &amp; Apply</strong> button before any change. Missing information must be provided first.
             </span>
           )}
         </div>
@@ -411,6 +434,21 @@ export default function AssistantModule({ actions, readOnly }: AssistantModulePr
                 <button onClick={() => resolveApproval(false)} className="px-4 py-2 rounded-lg border border-neutral-300 text-xs font-bold">Cancel</button>
                 <button onClick={() => resolveApproval(true)} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-xs font-bold">Approve &amp; Apply</button>
               </div>
+            </div>
+          </div>
+        )}
+        {showHelp && (
+          <div className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4">
+            <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-neutral-200 p-5 space-y-4">
+              <div className="flex items-center justify-between"><h3 className="font-bold text-neutral-900">AI Help &amp; Troubleshooting</h3><button onClick={() => setShowHelp(false)} className="text-neutral-500 text-lg" title="Close">×</button></div>
+              <div className="text-xs text-neutral-700 space-y-2">
+                <p><strong>Creating or editing:</strong> provide all required information. For a new student, include name, roll, class, guardian phone, and father name. The AI will then show an approval dialog.</p>
+                <p><strong>Approval:</strong> review the proposed change and press <strong>Approve &amp; Apply</strong>. Press <strong>Cancel</strong> to prevent any database change.</p>
+                <p><strong>Model error:</strong> open <a className="text-blue-700 underline" href="https://console.groq.com/docs/models" target="_blank" rel="noreferrer">Groq Models</a>, choose a model available to your account, set it as <code>VITE_GROQ_MODEL</code> in <code>.env</code>, and restart the Vite server.</p>
+                <p><strong>Request too large:</strong> start a new conversation with the clear button, ask one task at a time, and use a specific student name or ID. Detailed records are loaded only when needed.</p>
+                <p><strong>Network or key error:</strong> confirm <code>VITE_GROQ_API_KEY</code> and <code>VITE_GROQ_BASE_URL=https://api.groq.com/openai/v1</code>, then restart the development server.</p>
+              </div>
+              <button onClick={() => setShowHelp(false)} className="w-full bg-neutral-900 text-white rounded-lg py-2 text-xs font-bold">Close</button>
             </div>
           </div>
         )}

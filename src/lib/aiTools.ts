@@ -209,7 +209,8 @@ const TABLE_KEYS: Record<string, string> = {
 
 function trimForTool(rows: any[], limit: number): string {
   const sliced = limit && limit > 0 ? rows.slice(0, limit) : rows.slice(0, 50);
-  return JSON.stringify(sliced, null, 2);
+  const output = JSON.stringify(sliced, null, 2);
+  return output.length <= 1800 ? output : `${output.slice(0, 1800)}\n[Result shortened. Use a narrower query or limit for complete details.]`;
 }
 
 export interface ToolResult {
