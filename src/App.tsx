@@ -265,6 +265,20 @@ export default function App() {
   // ── PERSISTENCE: write back only AFTER the first hydrate ──
   // Writing before hydrate would push empty [] arrays and wipe Supabase.
   const canPersist = dbReady && dbHydrated;
+  useEffect(() => {
+    if (!canPersist) return;
+    [
+      'samdani_students',
+      'samdani_notifications',
+      'samdani_student_attendance_records',
+      'samdani_teacher_routines',
+      'samdani_student_results',
+      'samdani_academic_info',
+      'samdani_homework',
+    ].forEach((key) => {
+      if (dbGet(key) == null) dbSet(key, []);
+    });
+  }, [canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_invoice_counter', invoiceCounter); }, [invoiceCounter, canPersist]);
   useEffect(() => {
     if (canPersist) dbSet('samdani_students', students.map((student) => ({
