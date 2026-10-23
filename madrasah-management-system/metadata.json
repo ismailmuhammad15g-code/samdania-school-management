@@ -1,6 +1,0 @@
-{
-  "name": "Madrasah Management System",
-  "description": "A comprehensive management system for Samdania Talimul Islam Madrasah to track finances, student fees, and institutional operations with Google Sheets integration.",
-  "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
