@@ -30,6 +30,8 @@ export interface Student {
   fatherName: string;
   motherName: string;
   extraInfo: string;
+  photoUrl?: string;
+  photo_url?: string;
   previousDue: number;
   currentMonthFee: number;
   examFee: number;

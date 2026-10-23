@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Student, FeePayment, MONTHS, StudentAttendanceRecord } from '../types';
 import { generateFeeReceiptPDF, generateAttendanceInvoicePDF } from './PDFGenerator';
 import PasswordConfirmModal from './PasswordConfirmModal';
 import { parseNumberWithBengaliSupport, normalizeForComparison, isClassMatch } from '../lib/digitUtils';
 import { useLiveStudentSearch } from '../lib/useLiveStudentSearch';
+import { uploadStudentPhoto } from '../lib/imgbb';
 import { 
   Users, 
   Search, 
@@ -127,6 +129,7 @@ export default function FeesModule({
   const [generatedSlips, setGeneratedSlips] = useState<Student[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [generationMessage, setGenerationMessage] = useState('');
 
   // Calculate total due for a student with waiver and advance paid logic
   const calculateTotalDue = (student: Student): number => {
@@ -139,62 +142,25 @@ export default function FeesModule({
   // Fetch students with dues > 0 based on selected classes
   const fetchStudentsWithDues = async () => {
     setIsGenerating(true);
-    
-    // Simulate loading delay for UI polish
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    let filteredStudents: Student[] = [];
-    
-    if (selectedClasses.includes('All Classes')) {
-      filteredStudents = students.filter(student => {
-        const totalDue = calculateTotalDue(student);
-        return totalDue > 0;
-      });
-    } else {
-      filteredStudents = students.filter(student => {
-        return selectedClasses.includes(student.class);
-      }).filter(student => {
-        const totalDue = calculateTotalDue(student);
-        return totalDue > 0;
-      });
-    }
-    
-    setGeneratedSlips(filteredStudents);
-    setIsGenerating(false);
-    setShowPreview(true);
-  };
+    setGenerationMessage('');
 
-    const generatePrintableSlips = async () => {
-    setIsGenerating(true);
-    
-    // Simulate loading delay for UI polish
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    let filteredStudents: Student[] = [];
-    
-    if (selectedClasses.includes('All Classes')) {
-      filteredStudents = students.filter(student => {
-        const totalDue = calculateTotalDue(student);
-        return totalDue > 0;
+    try {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      const filteredStudents = students.filter(student => {
+        const matchesClass = selectedClasses.includes('All Classes') || selectedClasses.includes(student.class);
+        return matchesClass && calculateTotalDue(student) > 0;
       });
-    } else {
-      filteredStudents = students.filter(student => {
-        return selectedClasses.includes(student.class);
-      }).filter(student => {
-        const totalDue = calculateTotalDue(student);
-        return totalDue > 0;
-      });
+
+      setGeneratedSlips(filteredStudents);
+      setShowPreview(true);
+      setIsModalOpen(false);
+      setGenerationMessage('Slips generated successfully!');
+    } catch (error) {
+      console.error('Could not generate due slips:', error);
+      setGenerationMessage('Could not generate slips. Please try again.');
+    } finally {
+      setIsGenerating(false);
     }
-    
-    setGeneratedSlips(filteredStudents);
-    setIsGenerating(false);
-    setShowPreview(true);
-    
-    // Show success message (you can integrate with a toast notification system)
-    console.log('Slips generated successfully!');
-    
-    // Close the input modal automatically
-    setIsModalOpen(false);
   };
 
   // Close modal and reset
@@ -210,6 +176,8 @@ export default function FeesModule({
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [receivedByOpen, setReceivedByOpen] = useState(false);
+  const [studentPhotoUrl, setStudentPhotoUrl] = useState('');
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [studentFormData, setStudentFormData] = useState({
     name: '',
     roll: '',
@@ -325,6 +293,7 @@ export default function FeesModule({
       waiver: '0',
       advancePaid: '0',
     });
+    setStudentPhotoUrl('');
     setIsStudentFormOpen(true);
   };
 
@@ -348,7 +317,20 @@ export default function FeesModule({
       waiver: student.waiver.toString(),
       advancePaid: student.advancePaid.toString(),
     });
+    setStudentPhotoUrl(student.photoUrl || student.photo_url || '');
     setIsStudentFormOpen(true);
+  };
+
+  const handleStudentPhotoChange = async (file?: File) => {
+    if (!file) return;
+    setPhotoUploading(true);
+    try {
+      setStudentPhotoUrl(await uploadStudentPhoto(file));
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Photo upload failed.');
+    } finally {
+      setPhotoUploading(false);
+    }
   };
 
   // Student Form Submit (Add/Edit)
@@ -379,6 +361,8 @@ export default function FeesModule({
       fatherName: studentFormData.fatherName,
       motherName: studentFormData.motherName,
       extraInfo: studentFormData.extraInfo,
+      photoUrl: studentPhotoUrl || undefined,
+      photo_url: studentPhotoUrl || undefined,
       previousDue: parseNumberWithBengaliSupport(studentFormData.previousDue) || 0,
       currentMonthFee: parseNumberWithBengaliSupport(studentFormData.currentMonthFee) || 0,
       examFee: parseNumberWithBengaliSupport(studentFormData.examFee) || 0,
@@ -1366,6 +1350,15 @@ export default function FeesModule({
                   />
                 </div>
 
+                <div>
+                  <label className="block text-[11px] font-bold text-stone-700 mb-1">Student Profile Photo</label>
+                  <label className="w-full border border-stone-200 rounded-lg px-3 py-2 text-xs text-stone-600 flex items-center justify-between cursor-pointer">
+                    <span>{photoUploading ? 'Uploading photo...' : studentPhotoUrl ? 'Photo uploaded' : 'Choose profile photo'}</span>
+                    <input type="file" accept="image/*" className="hidden" disabled={photoUploading} onChange={(e) => handleStudentPhotoChange(e.target.files?.[0])} />
+                  </label>
+                  {studentPhotoUrl && <img src={studentPhotoUrl} alt="Student profile" className="mt-2 h-14 w-14 rounded-lg object-cover border border-stone-200" />}
+                </div>
+
                 {/* Parent Information (অভিভাবকের তথ্য) */}
                 <div>
                   <h4 className="text-xs font-serif font-bold text-[#2c332d] uppercase border-b border-stone-100 pb-2 mb-3 mt-1">
@@ -1550,33 +1543,18 @@ export default function FeesModule({
                     Back to Settings
                   </button>
                 </div>
+                {generationMessage && (
+                  <p className="mt-2 text-xs font-semibold text-[#4a5d4e]" role="status">{generationMessage}</p>
+                )}
                 <button
                   onClick={async () => {
                     setIsPrinting(true);
-                    
-                    // Create HTML content for the print container
-                    const printContainer = document.getElementById('print-slips-container');
-                    if (!printContainer) {
-                      console.error('Print container not found');
-                      setIsPrinting(false);
-                      return;
-                    }
-                    
-                    // Use the iframe-based printing from PDFGenerator.ts
                     try {
-                      // Import the print function from PDFGenerator
-                      const { printHtmlDirect } = await import('./PDFGenerator.ts');
-                      
-                      await printHtmlDirect(printContainer.outerHTML, {
-                        pageWidthPx: 816,
-                        pageHeightPx: 1056,
-                        pageSize: 'A4 portrait',
-                        rootId: 'print-slips-container'
-                      });
+                      await document.fonts.ready;
+                      await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+                      window.print();
                     } catch (error) {
                       console.error('Print failed:', error);
-                      // Fallback to traditional print
-                      window.print();
                     } finally {
                       setIsPrinting(false);
                     }
@@ -1610,37 +1588,11 @@ export default function FeesModule({
                 })}
               </div>
 
-              {/* Print Container - Hidden in normal view, shown during print */}
-              <div id="print-slips-container" className="hidden print:block">
-                {generatedSlips.length > 0 && (
-                  <div className="space-y-3">
-                    {generatedSlips.map((student) => {
-                      const totalDue = calculateTotalDue(student);
-                      return (
-                        <div key={student.id} className="flex items-center justify-between p-3 bg-[#f5f2ed]/50 rounded-lg border border-stone-200">
-                          <div className="flex-1">
-                            <p className="text-xs font-bold text-[#2c332d]">{student.name}</p>
-                            <p className="text-[10px] text-stone-500">Class: {student.class} | Roll: {student.roll}</p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-xs font-mono font-bold text-[#b27d6d]">৳ {totalDue.toLocaleString()}</p>
-                            <p className="text-[10px] text-stone-400">
-                              Previous: ৳ {student.previousDue.toLocaleString()} |
-                              Monthly: ৳ {student.currentMonthFee.toLocaleString()} |
-                              Exam: ৳ {student.examFee.toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
             </div>
           )}
             </div>
-          )}
         </div>
+      )}
 
         {/* Modal for input */}
         {isModalOpen && (
@@ -1722,8 +1674,6 @@ export default function FeesModule({
             </div>
           </div>
         )}
-      </div>
-    )}
 
     {guardAction && (
       <PasswordConfirmModal
@@ -1732,6 +1682,67 @@ export default function FeesModule({
         onConfirm={guardAction.onConfirm}
         actionLabel={guardAction.label}
       />
+    )}
+    {typeof document !== 'undefined' && createPortal(
+      <div id="print-slips-container" aria-hidden="true">
+        {Array.from({ length: Math.ceil(generatedSlips.length / 8) }, (_, pageIndex) => (
+          <div className="a4-page-wrapper" key={`slip-page-${pageIndex}`}>
+            {generatedSlips.slice(pageIndex * 8, pageIndex * 8 + 8).map((student) => {
+              const finalTotalDue = calculateTotalDue(student);
+              return (
+                <div className="due-slip" key={student.id}>
+                  <div style={{ textAlign: 'center', lineHeight: 1.4, marginBottom: 2 }}>
+                    <p style={{ color: '#006400', fontWeight: 'bold', fontSize: 11, margin: 0 }}>
+                      الْمَدْرَسَةُ الصَّمَدَانِيَّةُ لِلتَّعْلِيمِ الْإِسْلَامِيِّ بِغَلَا جِيبَة
+                    </p>
+                    <h2 style={{ color: '#006400', fontWeight: 'bold', fontSize: 15, margin: '1px 0' }}>
+                      সামদানীয়া তা'লীমুল ইসলাম মাদ্রাসা, গলাচিপা
+                    </h2>
+                    <p style={{ color: '#0000CD', fontSize: 9, margin: '1px 0' }}>
+                      নূরানী ও ইবতেদায়ী বিভাগ (আবাসিক-অনাবাসিক) হিফজ বিভাগ (আবাসিক) নাজেরা বিভাগ (আবাসিক)
+                    </p>
+                    <p style={{ color: '#000', fontSize: 8, margin: 0 }}>
+                      (পীর বদরুল ইসলাম সামদানী কমপ্লেক্স) খানকায়ে ফুরফুরা শরীফ, দারুল আমান, ০২নং ওয়ার্ড, গলাচিপা, পটুয়াখালী। স্থাপিতঃ ২০০৬ খ্রিঃ।
+                    </p>
+                  </div>
+                  <table className="due-slip-table" style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid black', fontSize: 12 }}>
+                    <tbody>
+                      <tr>
+                        <td><strong>নাম:</strong> {student.name}</td>
+                        <td><strong>শ্রেণি:</strong> {student.class}</td>
+                        <td><strong>রোল:</strong> {student.roll}</td>
+                      </tr>
+                      <tr>
+                        {[
+                          ['পূর্ব বকেয়া', student.previousDue],
+                          ['গাড়ি', student.transport],
+                          ['বর্তমান মাস', student.currentMonthFee],
+                          ['পরীক্ষা ফি', student.examFee],
+                        ].map(([label, amount]) => (
+                          <td key={label}>
+                            <strong>{label}:</strong>{' '}
+                            {Number(amount) > 0 ? Number(amount).toLocaleString('bn-BD') : ''}
+                          </td>
+                        ))}
+                        <td><strong>সর্বমোট:</strong> {finalTotalDue.toLocaleString('bn-BD')}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div className="due-slip-footer-block">
+                    <p style={{ fontSize: 9, lineHeight: 1.15, margin: '2px 0' }}>
+                      আগামি {deadlineDate} ইং তারিখের মধ্যে আপনার বকেয়া {finalTotalDue.toLocaleString('bn-BD')} টাকা পরিশোধ করুন।
+                    </p>
+                    <div style={{ textAlign: 'right', paddingRight: 20, fontSize: 9, lineHeight: 1.1 }}>
+                      অধ্যক্ষ
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>,
+      document.body
     )}
     </>
   );

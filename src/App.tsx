@@ -51,6 +51,8 @@ import QrGenerateSection from './components/QrGenerateSection';
 import AttendanceReportTab from './components/AttendanceReportTab';
 import PendingOperations from './components/PendingOperations';
 import AssistantModule from './components/AssistantModule';
+import AppManagementPage from './components/AppManagementPage';
+import MissingFilloutsPage from './components/MissingFilloutsPage';
 import { tabToPath, pathToTab, type AppTab } from './lib/routes';
 import type { AgentActions } from './lib/aiTools';
 
@@ -170,7 +172,28 @@ export default function App() {
     // Seed / migrate admin credentials into Supabase so login works on every device.
     ensureAdminCredentials();
 
-    setStudents(load('samdani_students', []));
+    const sharedStudents = dbGet('students');
+    setStudents(sharedStudents != null ? load('students', [], (value: any[]) => value.map((student) => ({
+      ...student,
+      id: student.id || student.studentId || `ST-${Date.now().toString(36)}`,
+      name: student.name || student.banglaName || '',
+      roll: String(student.roll ?? student.rollNumber ?? ''),
+      class: student.class || student.className || '',
+      contact: student.contact || student.phone || '',
+      photoUrl: student.photoUrl || student.photo_url || '',
+      photo_url: student.photo_url || student.photoUrl || '',
+      fatherName: student.fatherName || '',
+      motherName: student.motherName || '',
+      extraInfo: student.extraInfo || '',
+      previousDue: Number(student.previousDue) || 0,
+      currentMonthFee: Number(student.currentMonthFee) || 0,
+      examFee: Number(student.examFee) || 0,
+      transport: Number(student.transport) || 0,
+      electricity: Number(student.electricity) || 0,
+      water: Number(student.water) || 0,
+      waiver: Number(student.waiver) || 0,
+      advancePaid: Number(student.advancePaid) || 0,
+    }))) : load('samdani_students', []));
     setLedger(load('samdani_ledger', []));
     setPayments(load('samdani_payments', [], (v: any[]) =>
       v.map((p, i) => ({ ...p, invoiceNo: p.invoiceNo ?? (101 + i) }))
@@ -243,7 +266,23 @@ export default function App() {
   // Writing before hydrate would push empty [] arrays and wipe Supabase.
   const canPersist = dbReady && dbHydrated;
   useEffect(() => { if (canPersist) dbSet('samdani_invoice_counter', invoiceCounter); }, [invoiceCounter, canPersist]);
-  useEffect(() => { if (canPersist) dbSet('samdani_students', students); }, [students, canPersist]);
+  useEffect(() => {
+    if (canPersist) dbSet('samdani_students', students.map((student) => ({
+      ...student,
+      photo_url: student.photoUrl || student.photo_url || '',
+    })));
+  }, [students, canPersist]);
+  useEffect(() => {
+    if (!canPersist) return;
+    dbSet('students', students.map((student) => ({
+      ...student,
+      rollNumber: student.roll,
+      className: student.class,
+      phone: student.contact,
+      photoUrl: student.photoUrl || '',
+      photo_url: student.photoUrl || student.photo_url || '',
+    })));
+  }, [students, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_ledger', ledger); }, [ledger, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_payments', payments); }, [payments, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_hifz_students', hifzStudents); }, [hifzStudents, canPersist]);
@@ -1363,6 +1402,20 @@ export default function App() {
             pendingEditStudentId={pendingEditStudentId}
             onClearPendingEdit={() => setPendingEditStudentId(null)}
             onDeletePayment={handleDeletePayment}
+            readOnly={adminReadOnly}
+          />
+        )}
+
+        {activeTab === 'appManagement' && (
+          <AppManagementPage readOnly={adminReadOnly} />
+        )}
+
+        {activeTab === 'missingFillouts' && (
+          <MissingFilloutsPage
+            students={students}
+            academicClasses={academicClasses}
+            onSaveStudent={handleEditStudent}
+            onOpenEditStudent={(student) => { setPendingEditStudentId(student.id); navigate('fees'); }}
             readOnly={adminReadOnly}
           />
         )}

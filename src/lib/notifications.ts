@@ -43,7 +43,30 @@ function emitChanged(): void {
 export function getNotifications(): AppNotification[] {
   try {
     const v = dbGet(KEY);
-    return Array.isArray(v) ? (v as AppNotification[]) : [];
+    if (Array.isArray(v)) {
+      return v.map((item: any) => item && typeof item.content === 'string'
+        ? {
+            id: item.id,
+            type: 'system' as const,
+            title: item.title || 'Notice',
+            message: item.content,
+            createdAt: item.createdAt || Date.parse(item.published_at) || Date.now(),
+            read: Boolean(item.read),
+          }
+        : item as AppNotification);
+    }
+    if (v && typeof v === 'object' && 'message' in v) {
+      const item = v as { id?: string; title?: string; message: string; createdAt?: number };
+      return [{
+        id: item.id || `PUSH-${item.createdAt || Date.now()}`,
+        type: 'system',
+        title: item.title || 'Notification',
+        message: item.message,
+        createdAt: item.createdAt || Date.now(),
+        read: false,
+      }];
+    }
+    return [];
   } catch {
     return [];
   }
@@ -52,13 +75,24 @@ export function getNotifications(): AppNotification[] {
 /** Push a new notification. Persisted to the db so it syncs everywhere live. */
 export function pushNotification(n: Omit<AppNotification, 'id' | 'createdAt' | 'read'>): void {
   const list = getNotifications();
-  const item: AppNotification = {
-    ...n,
+  const item = {
     id: `NTF-${Date.now().toString(36)}-${Math.floor(Math.random() * 900 + 100)}`,
-    createdAt: Date.now(),
+    title: n.title,
+    content: n.message,
+    published_at: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    is_breaking: false,
+    category: 'General',
     read: false,
   };
-  const next = [item, ...list].slice(0, MAX);
+  const next = [item, ...list.map((notification) => ({
+    id: `NTF-${Date.now().toString(36)}-${Math.floor(Math.random() * 900 + 100)}`,
+    title: notification.title,
+    content: notification.message,
+    published_at: new Date(notification.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    is_breaking: false,
+    category: 'General',
+    read: notification.read,
+  }))].slice(0, MAX);
   dbSet(KEY, next);
   emitChanged();
 }

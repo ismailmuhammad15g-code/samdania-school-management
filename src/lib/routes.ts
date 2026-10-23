@@ -14,7 +14,9 @@ export type AppTab =
   | 'hifz'
   | 'summary'
   | 'pending'
-  | 'assistant';
+  | 'assistant'
+  | 'appManagement'
+  | 'missingFillouts';
 
 export const TAB_PATHS: Record<AppTab, string> = {
   dashboard: '/home',
@@ -29,6 +31,8 @@ export const TAB_PATHS: Record<AppTab, string> = {
   summary: '/summary',
   pending: '/pending',
   assistant: '/assistant',
+  appManagement: '/app-management',
+  missingFillouts: '/missing-fillouts',
 };
 
 const PATH_TABS: Record<string, AppTab> = Object.entries(TAB_PATHS).reduce(

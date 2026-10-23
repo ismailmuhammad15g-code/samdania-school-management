@@ -20,6 +20,8 @@ import {
   ClipboardList,
   Eye,
   Bot
+  ,Megaphone
+  ,FileWarning
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 
@@ -40,6 +42,8 @@ const NAV_ITEMS = [
   { id: 'loans', label: 'Loans', icon: PiggyBank },
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'assitant', label: 'Assistant', icon: Bot },
+  { id: 'appManagement', label: 'App Management', icon: Megaphone },
+  { id: 'missingFillouts', label: 'Missing Fillouts', icon: FileWarning },
 ];
 
 export default function Navbar({

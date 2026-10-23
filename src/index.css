@@ -40,33 +40,43 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Print: only the report sheet (#print-slips-container) is sent to the printer. */
+/* Keep the print sheet out of the screen layout; it is mounted directly under body. */
+#print-slips-container {
+  display: none;
+}
+
 @media print {
-  body * { visibility: hidden !important; }
-  #print-slips-container, #print-slips-container * { visibility: visible !important; }
   body > *:not(#print-slips-container) { display: none !important; }
+  #print-slips-container, #print-slips-container * { visibility: visible !important; }
+  #print-slips-container { display: block !important; }
   
   @page {
     size: A4 portrait;
-    margin: 10mm; /* Standard printable margin */
+    margin: 8mm;
   }
   
   /* The wrapper that holds exactly 8 students */
   .a4-page-wrapper {
-    height: 277mm; /* A4 height minus the 10mm top/bottom margins */
+    height: 281mm;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    gap: 2mm;
     page-break-after: always; /* Force a new page after every 8 slips */
+  }
+
+  .a4-page-wrapper:last-child {
+    page-break-after: auto;
   }
 
   /* The individual Student Slip (exactly 1/8th of the page) */
   .due-slip {
-    height: calc(100% / 8 - 4px); /* Divide height by 8, minus gap space */
-    border: 2px solid #000; /* Heavy outer border */
+    height: calc((100% - 14mm) / 8);
+    border: 2px solid #000;
     box-sizing: border-box;
-    padding: 2px 4px;
-    margin-bottom: 2px;
+    padding: 3px 6px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
     overflow: hidden;
   }
 
@@ -77,8 +87,14 @@ body {
     border: 1px solid #000;
   }
   .due-slip-table td, .due-slip-table th {
-    border: 1px solid #000; /* Thin inner borders */
-    font-size: 11px;
-    padding: 1px 4px;
+    border: 1px solid #000;
+    font-size: 10px;
+    padding: 1px 3px;
+  }
+
+  .due-slip-footer-block {
+    margin-top: auto;
+    flex-shrink: 0;
+    line-height: 1.1;
   }
 }
