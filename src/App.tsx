@@ -1413,6 +1413,7 @@ export default function App() {
           />
         )}
 
+
         {activeTab === 'fees' && (
           <FeesModule
             students={students}

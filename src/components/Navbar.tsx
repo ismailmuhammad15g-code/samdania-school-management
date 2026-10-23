@@ -17,6 +17,7 @@ import {
   ChevronsDown,
   BookOpenCheck,
   FileStack,
+  FileText,
   ClipboardList,
   Eye,
   Bot

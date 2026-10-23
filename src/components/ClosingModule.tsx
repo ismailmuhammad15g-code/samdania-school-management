@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { LedgerTransaction } from '../types';
 import logo2 from '../assets/images/logo2.png';
 import { generateClosingReportPDF, ClosingReportRow } from './PDFGenerator';
+import DescriptiveReportTab from './DescriptiveReportTab';
 import {
   FileStack,
   Download,
@@ -302,6 +303,7 @@ const ClosingSection: React.FC<{
 };
 
 export default function ClosingModule({ ledger }: ClosingModuleProps) {
+  const [activeView, setActiveView] = useState<'closing' | 'reports'>('closing');
   const [busy, setBusy] = useState<null | 'monthly' | 'yearly'>(null);
 
   const monthlyStats = useMemo(() => groupByPeriod(ledger, 'month'), [ledger]);
@@ -369,6 +371,12 @@ export default function ClosingModule({ ledger }: ClosingModuleProps) {
         </div>
       </div>
 
+      <div className="bg-white border border-stone-200 rounded-xl p-2 flex gap-2">
+        <button onClick={() => setActiveView('closing')} className={`px-4 py-2 rounded-lg text-xs font-bold ${activeView === 'closing' ? 'bg-[#4a5d4e] text-white' : 'text-stone-600 hover:bg-stone-100'}`}>Monthly / Yearly Closing</button>
+        <button onClick={() => setActiveView('reports')} className={`px-4 py-2 rounded-lg text-xs font-bold ${activeView === 'reports' ? 'bg-[#4a5d4e] text-white' : 'text-stone-600 hover:bg-stone-100'}`}>বর্ণনামূলক রিপোর্ট ও প্রিন্ট</button>
+      </div>
+
+      {activeView === 'reports' ? <DescriptiveReportTab ledger={ledger} /> : <>
       {/* Monthly Closing */}
       <ClosingSection
         title="Monthly Closing"
@@ -396,6 +404,7 @@ export default function ClosingModule({ ledger }: ClosingModuleProps) {
         onDownload={() => handleYearly('download')}
         onPrint={() => handleYearly('print')}
       />
+      </>}
     </div>
   );
 }
