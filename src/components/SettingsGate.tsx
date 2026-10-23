@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { sha256Hex } from '../lib/sha256';
 import { dbGet, dbSet } from '../lib/localDb';
+import { verifyAdminPassword } from '../lib/auth';
 import { Lock, Eye, EyeOff, CheckCircle, AlertCircle, KeyRound } from 'lucide-react';
 
 // A dedicated, separate password for the Settings area. It is intentionally
@@ -27,7 +28,7 @@ export default function SettingsGate({ onUnlocked }: SettingsGateProps) {
     setMode(existing ? 'unlock' : 'create');
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setMsg(null);
 
@@ -57,13 +58,20 @@ export default function SettingsGate({ onUnlocked }: SettingsGateProps) {
       return;
     }
     setLoading(true);
-    const stored = dbGet(HASH_KEY);
-    const ok = Boolean(stored) && stored === sha256Hex(password + SETTINGS_SALT);
-    setLoading(false);
-    if (ok) {
+    try {
+      const stored = dbGet(HASH_KEY);
+      const matchesSettingsPassword = typeof stored === 'string'
+        && stored === sha256Hex(password + SETTINGS_SALT);
+      const matchesAdminPassword = await verifyAdminPassword(password);
+      if (!matchesSettingsPassword && !matchesAdminPassword) {
+        setMsg({ type: 'error', text: 'Incorrect password. Enter the Settings password or your current admin password.' });
+        return;
+      }
       onUnlocked();
-    } else {
-      setMsg({ type: 'error', text: 'Incorrect settings password.' });
+    } catch {
+      setMsg({ type: 'error', text: 'Password verification failed. Please try again.' });
+    } finally {
+      setLoading(false);
     }
   };
 
