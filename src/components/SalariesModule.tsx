@@ -28,7 +28,8 @@ import {
   CalendarOff,
   CalendarPlus,
   CalendarCheck,
-  XCircle
+  XCircle,
+  Filter
 } from 'lucide-react';
 
 interface SalariesModuleProps {
@@ -177,6 +178,8 @@ export default function SalariesModule({
   const [leaveTeacher, setLeaveTeacher] = useState<TeacherAccount | null>(null);
   const [leaveDraft, setLeaveDraft] = useState({ startDate: '', endDate: '', notes: '' });
   const [leaveDecisionNotes, setLeaveDecisionNotes] = useState<Record<string, string>>({});
+  const [leaveHistoryTeacher, setLeaveHistoryTeacher] = useState('all');
+  const [leaveHistoryStatus, setLeaveHistoryStatus] = useState<'all' | 'pending' | 'approved' | 'denied'>('all');
   const todayStr = (() => {
     const t = new Date();
     return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
@@ -214,6 +217,32 @@ export default function SalariesModule({
     teacherLeaves.find(
       (l) => l.teacherId === teacherId && (l.status === undefined || l.status === 'approved') && l.startDate <= todayStr && todayStr <= l.endDate
     );
+
+  const pendingLeaveFor = (teacherId: string): TeacherLeave | undefined =>
+    teacherLeaves.find((l) => l.teacherId === teacherId && l.status === 'pending');
+
+  const leaveDays = (leave: TeacherLeave): number => {
+    const start = new Date(`${leave.startDate}T00:00:00`);
+    const end = new Date(`${leave.endDate}T00:00:00`);
+    const difference = end.getTime() - start.getTime();
+    return Number.isFinite(difference) && difference >= 0
+     ? Math.floor(difference / 86400000) + 1
+     : 0;
+  };
+
+  const leaveHistory = useMemo(() => teacherLeaves
+    .filter((leave) => leaveHistoryTeacher === 'all' || leave.teacherId === leaveHistoryTeacher)
+    .filter((leave) => leaveHistoryStatus === 'all' || (leave.status || 'approved') === leaveHistoryStatus)
+    .sort((a, b) => b.startDate.localeCompare(a.startDate)), [teacherLeaves, leaveHistoryTeacher, leaveHistoryStatus]);
+
+  const leaveTotals = useMemo(() => {
+    const approvedLeaves = teacherLeaves.filter((leave) => (leave.status || 'approved') === 'approved');
+    return {
+     requests: teacherLeaves.length,
+     approved: approvedLeaves.length,
+     days: approvedLeaves.reduce((sum, leave) => sum + leaveDays(leave), 0),
+    };
+  }, [teacherLeaves]);
 
   const [selectedStaff, setSelectedStaff] = useState<TeacherStaff | null>(null);
   const [disburseData, setDisburseData] = useState({
@@ -761,6 +790,7 @@ export default function SalariesModule({
             verifiedTeachers.map((a) => {
               const rCount = teacherRoutines.filter((r) => r.teacherId === a.id).length;
               const onLeave = activeLeaveFor(a.id);
+              const pendingLeave = pendingLeaveFor(a.id);
               return (
                 <div
                   key={a.id}
@@ -799,6 +829,11 @@ export default function SalariesModule({
                         <CalendarOff className="h-3.5 w-3.5" />
                         On Leave (ছুটিতে): {onLeave.startDate} → {onLeave.endDate}
                       </p>
+                    ) : pendingLeave ? (
+                      <p className="text-[11px] text-sky-700 font-bold flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5" />
+                        Leave Pending: {pendingLeave.startDate} → {pendingLeave.endDate}
+                      </p>
                     ) : (
                       <p className="text-[11px] text-stone-400">
                         Leave (ছুটি): None
@@ -817,13 +852,15 @@ export default function SalariesModule({
                       <Calendar className="h-3.5 w-3.5 text-[#d9c5b2]" />
                       Add Routine
                     </button>
-                    <button
-                      onClick={() => openLeaveModal(a)}
-                      className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm active:scale-95 cursor-pointer border border-indigo-700 flex items-center justify-center gap-1.5"
-                    >
-                      <CalendarPlus className="h-3.5 w-3.5 text-indigo-100" />
-                      Add Leave
-                    </button>
+                    {!onLeave && !pendingLeave && (
+                      <button
+                        onClick={() => openLeaveModal(a)}
+                        className="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm active:scale-95 cursor-pointer border border-indigo-700 flex items-center justify-center gap-1.5"
+                      >
+                        <CalendarPlus className="h-3.5 w-3.5 text-indigo-100" />
+                        Add Leave
+                      </button>
+                    )}
                     {onLeave && (
                       <button
                         onClick={() => handleDeleteLeave(onLeave.id)}
@@ -921,6 +958,86 @@ export default function SalariesModule({
                     </div>
                   );
                 })
+              )}
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+            <div className="bg-[#f5f2ed] border-b border-stone-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-serif font-bold text-[#2c332d]">Leave History (ছুটির ইতিহাস)</h3>
+                <p className="text-[11px] text-stone-500 mt-0.5">All requests, decisions, current leave, and total approved leave days.</p>
+              </div>
+              <Filter className="h-4 w-4 text-stone-500" />
+            </div>
+            <div className="p-4 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-lg border border-stone-200 bg-white px-3 py-2">
+                  <p className="text-[9px] font-bold uppercase text-stone-400">All Requests</p>
+                  <p className="text-lg font-black text-[#2c332d]">{leaveTotals.requests}</p>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                  <p className="text-[9px] font-bold uppercase text-emerald-600">Approved Leaves</p>
+                  <p className="text-lg font-black text-emerald-700">{leaveTotals.approved}</p>
+                </div>
+                <div className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2">
+                  <p className="text-[9px] font-bold uppercase text-indigo-600">Approved Days</p>
+                  <p className="text-lg font-black text-indigo-700">{leaveTotals.days}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="text-[10px] font-bold text-stone-500">
+                  Teacher
+                  <select value={leaveHistoryTeacher} onChange={(e) => setLeaveHistoryTeacher(e.target.value)} className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs">
+                    <option value="all">All teachers</option>
+                    {verifiedTeachers.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>)}
+                  </select>
+                </label>
+                <label className="text-[10px] font-bold text-stone-500">
+                  Status
+                  <select value={leaveHistoryStatus} onChange={(e) => setLeaveHistoryStatus(e.target.value as typeof leaveHistoryStatus)} className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs">
+                    <option value="all">All statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="denied">Denied</option>
+                  </select>
+                </label>
+              </div>
+              {leaveHistory.length === 0 ? (
+                <p className="text-xs text-stone-500">No leave history matches the selected filters.</p>
+              ) : (
+                <div className="space-y-2">
+                  {leaveHistory.map((leave) => {
+                    const teacher = teacherAccounts.find((account) => account.id === leave.teacherId);
+                    const status = leave.status || 'approved';
+                    const current = activeLeaveFor(leave.teacherId)?.id === leave.id;
+                    return (
+                      <div key={leave.id} className="rounded-xl border border-stone-200 p-3 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-xs font-bold text-[#2c332d]">{teacher?.fullName || 'Unknown teacher'}</p>
+                            <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
+                              status === 'approved' ? 'bg-emerald-100 text-emerald-700' :
+                              status === 'pending' ? 'bg-sky-100 text-sky-700' : 'bg-red-100 text-red-700'
+                            }`}>{status}</span>
+                            {current && <span className="rounded-full bg-amber-100 text-amber-700 px-2 py-0.5 text-[9px] font-bold">Currently on leave</span>}
+                          </div>
+                          <p className="text-[11px] text-stone-600 mt-1">{leave.startDate} → {leave.endDate} · {leaveDays(leave)} day(s)</p>
+                          {leave.notes && <p className="text-[10px] text-stone-500 mt-1">Teacher note: {leave.notes}</p>}
+                          {leave.adminNote && <p className="text-[10px] text-stone-500 mt-1">Admin note: {leave.adminNote}</p>}
+                        </div>
+                        {!readOnly && (status === 'approved' || current) && (
+                          <button
+                            onClick={() => handleDeleteLeave(leave.id)}
+                            className="shrink-0 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-2 rounded-lg cursor-pointer flex items-center justify-center gap-1.5"
+                          >
+                            <CalendarOff className="h-3.5 w-3.5" />
+                            Cancel Leave
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
