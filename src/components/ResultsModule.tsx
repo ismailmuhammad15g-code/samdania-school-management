@@ -21,6 +21,7 @@ interface ResultsModuleProps {
   academicClasses: string[];
   onAddResult: (result: Omit<StudentResult, 'id' | 'recordedBy' | 'date'>) => void;
   onDeleteResult: (id: string) => void;
+  principalName: string;
   readOnly?: boolean;
 }
 
@@ -53,6 +54,7 @@ export default function ResultsModule({
   academicClasses,
   onAddResult,
   onDeleteResult,
+  principalName,
   readOnly,
 }: ResultsModuleProps) {
   const [activeTab, setActiveTab] = useState<'board' | 'enter' | 'combined'>('board');
@@ -1060,8 +1062,11 @@ export default function ResultsModule({
             {/* Signatures */}
             <div className="grid grid-cols-2 gap-4 pt-12 text-[10px] text-stone-500 font-bold">
               <div className="text-center">
-                <div className="border-t border-stone-400 max-w-[150px] mx-auto pt-1 font-serif">samdaniaa madrasah</div>
-                <span>Principal (নাজিম সাহেব)</span>
+                <div className="border-t border-stone-400 max-w-[150px] mx-auto pt-1 font-serif">
+                  <span className="block">Principal (নাজিম সাহেব)</span>
+                  {principalName && <span className="block">{principalName}</span>}
+                  <span className="block">samdaniaa madrasah</span>
+                </div>
               </div>
               <div className="text-center">
                 <div className="border-t border-stone-400 max-w-[150px] mx-auto pt-1 font-serif">Class Muallim</div>
@@ -1199,8 +1204,11 @@ export default function ResultsModule({
 
             <div className="grid grid-cols-2 gap-4 pt-12 text-[10px] text-stone-500 font-bold">
               <div className="text-center">
-                <div className="border-t border-stone-400 max-w-[150px] mx-auto pt-1 font-serif">samdaniaa madrasah</div>
-                <span>Principal (নাজিম সাহেব)</span>
+                <div className="border-t border-stone-400 max-w-[150px] mx-auto pt-1 font-serif">
+                  <span className="block">Principal (নাজিম সাহেব)</span>
+                  {principalName && <span className="block">{principalName}</span>}
+                  <span className="block">samdaniaa madrasah</span>
+                </div>
               </div>
               <div className="text-center">
                 <div className="border-t border-stone-400 max-w-[150px] mx-auto pt-1 font-serif">Class Muallim</div>
