@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Bell, Megaphone, Plus, Send, Trash2 } from 'lucide-react';
 import { dbGet, dbSet, onDbChange } from '../lib/localDb';
-import AppAcademicSections from './AppAcademicSections';
-import { Student, TeacherAccount, TeacherStaff } from '../types';
+import { Student } from '../types';
 
 type Notice = {
   id: string;
@@ -21,13 +20,10 @@ function readNotices(): Notice[] {
 }
 
 interface AppManagementPageProps {
-  students: Student[];
-  teacherStaff: TeacherStaff[];
-  teacherAccounts: TeacherAccount[];
   readOnly?: boolean;
 }
 
-export default function AppManagementPage({ students, teacherStaff, teacherAccounts, readOnly = false }: AppManagementPageProps) {
+export default function AppManagementPage({ readOnly = false }: AppManagementPageProps) {
   const [notices, setNotices] = useState<Notice[]>(readNotices);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -122,7 +118,6 @@ export default function AppManagementPage({ students, teacherStaff, teacherAccou
         </div>
       </section>
 
-      <AppAcademicSections students={students} teacherStaff={teacherStaff} teacherAccounts={teacherAccounts} readOnly={readOnly} />
     </div>
   );
 }

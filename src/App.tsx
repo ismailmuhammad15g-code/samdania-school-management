@@ -810,6 +810,21 @@ export default function App() {
     setTeacherAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   };
 
+  const handleUpdateTeacherProfile = (accountId: string, patch: { fullName: string; designation: string; contact: string; email: string; bio: string; photoUrl?: string }) => {
+    const account = teacherAccounts.find((item) => item.id === accountId);
+    setTeacherAccounts((prev) => prev.map((item) => item.id === accountId ? { ...item, ...patch } : item));
+    if (account) {
+      setTeachersStaff((prev) => prev.map((staff) => staff.email === account.email ? {
+        ...staff,
+        name: patch.fullName,
+        designation: patch.designation,
+        contact: patch.contact,
+        email: patch.email,
+        bio: patch.bio,
+      } : staff));
+    }
+  };
+
   // Teacher class-routine (ক্লাস রুটিন) handlers — managed by admin, viewed by teacher
   const handleAddTeacherRoutine = (entry: Omit<TeacherRoutine, 'id'>) => {
     const newRoutine: TeacherRoutine = {
@@ -1421,7 +1436,7 @@ export default function App() {
         )}
 
         {activeTab === 'appManagement' && (
-          <AppManagementPage students={students} teacherStaff={teachersStaff} teacherAccounts={teacherAccounts} readOnly={adminReadOnly} />
+          <AppManagementPage readOnly={adminReadOnly} />
         )}
 
         {activeTab === 'missingFillouts' && (
@@ -1440,6 +1455,7 @@ export default function App() {
             salaryPayments={salaryPayments}
             paymentMethods={paymentMethods}
             teacherAccounts={teacherAccounts}
+            onUpdateTeacherProfile={handleUpdateTeacherProfile}
             teacherRoutines={teacherRoutines}
             onDeleteTeacherStaff={handleDeleteTeacherStaff}
             onPaySalary={handlePaySalary}

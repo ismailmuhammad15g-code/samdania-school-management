@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Camera, Loader2, X, UserCheck } from 'lucide-react';
 import { TeacherAccount } from '../types';
+import { uploadStudentPhoto } from '../lib/imgbb';
 
 // Downscale a captured selfie to a small JPEG data URL so it can be stored
 // directly in the app's own database (no external image host, no network
@@ -51,6 +52,8 @@ const ROLE_OPTIONS = ['Teacher', 'Staff', 'Hifz Muallim', 'Quran Teacher', 'Admi
 
 export default function TeacherProfileCompletion({ account, onComplete, onLater }: TeacherProfileCompletionProps) {
   const [profPhoto, setProfPhoto] = useState<string | null>(null);
+  const [profPhotoLink, setProfPhotoLink] = useState(account.photoUrl || '');
+  const [profFile, setProfFile] = useState<File | null>(null);
   const [profRole, setProfRole] = useState(account.role || account.designation || 'Teacher');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -58,21 +61,21 @@ export default function TeacherProfileCompletion({ account, onComplete, onLater 
   const handleCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
+    setProfFile(file);
     const reader = new FileReader();
     reader.onload = () => setProfPhoto(reader.result as string);
     reader.readAsDataURL(file);
   };
 
   const handleComplete = async () => {
-    if (!profPhoto) {
-      setError('Please capture your selfie photo.');
+    if (!profPhoto && !profPhotoLink.trim()) {
+      setError('Please choose a photo or enter an image link.');
       return;
     }
     setUploading(true);
     setError('');
     try {
-      // Store the selfie locally as a downscaled data URL — no external upload.
-      const url = await resizeToDataUrl(profPhoto);
+      const url = profPhotoLink.trim() || (profFile ? await uploadStudentPhoto(profFile) : await resizeToDataUrl(profPhoto!));
       onComplete(account.id, { photoUrl: url, role: profRole, designation: profRole });
     } catch (err: any) {
       setError(err && err.message ? err.message : 'Photo could not be processed. Please retake and try again.');
@@ -124,6 +127,7 @@ export default function TeacherProfileCompletion({ account, onComplete, onLater 
                 />
               </label>
             </div>
+            <input aria-label="Teacher profile image link" type="url" value={profPhotoLink} onChange={(e) => setProfPhotoLink(e.target.value)} className="mt-2 w-full bg-stone-50 border border-stone-200 rounded-lg text-xs px-3 py-2" />
             <p className="text-[10px] text-stone-400 mt-1">Camera only — gallery/device picker is disabled.</p>
           </div>
 

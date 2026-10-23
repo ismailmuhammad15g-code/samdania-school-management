@@ -45,10 +45,35 @@ body {
   display: none;
 }
 
+#attendance-print-container {
+  display: none;
+}
+
 @media print {
-  body > *:not(#print-slips-container) { display: none !important; }
+  body > *:not(#print-slips-container):not(#attendance-print-container) { display: none !important; }
   #print-slips-container, #print-slips-container * { visibility: visible !important; }
   #print-slips-container { display: block !important; }
+  #attendance-print-container, #attendance-print-container * { visibility: visible !important; }
+  #attendance-print-container { display: block !important; padding: 12mm; font-family: "Plus Jakarta Sans", "SolaimanLipi", sans-serif; color: #111; }
+  body.printing-attendance #print-slips-container { display: none !important; }
+  body:not(.printing-attendance) #attendance-print-container { display: none !important; }
+  .attendance-print-header { display: flex; align-items: center; gap: 6mm; border-bottom: 1px solid #d5d5d5; padding-bottom: 4mm; margin-bottom: 4mm; }
+  .attendance-print-header img { width: 22mm; height: 22mm; object-fit: contain; flex: 0 0 22mm; }
+  .attendance-print-institution { flex: 1; text-align: left; }
+  .attendance-print-institution h1 { color: #164c2a; font-size: 19px; line-height: 1.15; margin: 0 0 1mm; }
+  .attendance-print-institution p { color: #333; font-size: 11px; margin: 0 0 1mm; }
+  .attendance-print-institution span { color: #666; font-size: 9px; line-height: 1.2; }
+  .attendance-print-contact { min-width: 42mm; text-align: right; font-size: 10px; line-height: 1.35; }
+  .attendance-print-contact strong { display: block; font-size: 12px; margin-bottom: 1mm; }
+  .attendance-print-contact span { color: #555; }
+  .attendance-print-title { font-size: 13px; font-weight: 700; margin: 0 0 4mm; }
+  .attendance-print-list { border: 1px solid #000; }
+  .attendance-print-row { display: flex; align-items: center; gap: 8mm; border-bottom: 1px solid #bbb; padding: 3mm 4mm; font-size: 11px; page-break-inside: avoid; }
+  .attendance-print-row:last-child { border-bottom: 0; }
+  .attendance-print-row strong { min-width: 42mm; }
+  .attendance-print-row span { white-space: nowrap; }
+  .attendance-present { color: #087f3f; font-weight: 700; }
+  .attendance-absent { color: #b42318; font-weight: 700; }
   
   @page {
     size: A4 portrait;

@@ -44,12 +44,12 @@ ${snapshot}`;
 }
 
 function agentSystem(snapshot: string): string {
-  return `You are "Samdania AI Assistant" operating in AGENT MODE for Samdania Talimul Islam Madrasah. You can READ and MODIFY the school database using tools, and you know the entire database precisely. ACT autonomously and efficiently — perform the requested action immediately using the tools; do NOT ask for confirmation or approval, and do not pause. The system applies changes automatically.
+  return `You are "Samdania AI Assistant" operating in AGENT MODE for Samdania Talimul Islam Madrasah. You can READ and MODIFY the school database using tools, and you know the entire database precisely. Read live data when needed. For any create, update, delete, payment, or loan action, prepare the tool call but wait for the administrator's visible Approve button before the system executes it.
 
 Rules:
 - ALWAYS verify the required data is complete and correct BEFORE acting. If a required field is missing or unclear, DO NOT guess — politely ask the administrator for it, then act once provided.
 - For any read, use the read_data tool so you always use live data.
-- Perform writes (create / update / delete / payment / loan) immediately through the tools — no approval step.
+- Perform writes only after the application displays the proposed action and the administrator approves it. Never bypass approval.
 - After acting, give a short, elegant Markdown summary of what changed.
 - Respond in the same language the user writes in (Bengali / Arabic / English).
 - Tools: read_data, create_student, update_student, delete_student, record_fee_payment, add_loan.
@@ -66,8 +66,10 @@ export default function AssistantModule({ actions, readOnly }: AssistantModulePr
   const [thinking, setThinking] = useState(false);
   const [toolActivity, setToolActivity] = useState('');
   const [configured] = useState(isAiConfigured());
+  const [approval, setApproval] = useState<{ name: string; argumentsText: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const busyRef = useRef(false);
+  const approvalResolver = useRef<((approved: boolean) => void) | null>(null);
 
   const bgUrl = new URL('../assets/images/madrasha .jpg', import.meta.url).href;
 
@@ -93,6 +95,18 @@ export default function AssistantModule({ actions, readOnly }: AssistantModulePr
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, thinking, toolActivity]);
 
+  const requestApproval = useCallback((name: string, args: string) => new Promise<boolean>((resolve) => {
+    approvalResolver.current = resolve;
+    setApproval({ name, argumentsText: args });
+  }), []);
+
+  const resolveApproval = (approved: boolean) => {
+    const resolve = approvalResolver.current;
+    approvalResolver.current = null;
+    setApproval(null);
+    resolve?.(approved);
+  };
+
   const send = useCallback(
     async (raw?: string) => {
       if (busyRef.current) return;
@@ -108,11 +122,11 @@ export default function AssistantModule({ actions, readOnly }: AssistantModulePr
       busyRef.current = true;
 
       try {
-        const snapshot = buildSnapshot().text;
+        const snapshot = buildSnapshot(7000).text;
         const system = mode === 'ask' ? askSystem(snapshot) : agentSystem(snapshot);
-        const history: GroqMessage[] = current.slice(0, -1).map((m) => ({
+        const history: GroqMessage[] = current.slice(-7, -1).map((m) => ({
           role: m.role,
-          content: m.content,
+          content: m.content.slice(-1600),
         }));
         let working: GroqMessage[] = [
           { role: 'system', content: system },
@@ -127,7 +141,7 @@ export default function AssistantModule({ actions, readOnly }: AssistantModulePr
             messages: working,
             tools: mode === 'agent' ? AGENT_TOOLS : undefined,
             temperature: 0.2,
-            maxTokens: 1500,
+            maxTokens: 800,
           });
 
           if (resp.tool_calls && resp.tool_calls.length) {
@@ -137,6 +151,15 @@ export default function AssistantModule({ actions, readOnly }: AssistantModulePr
             ];
             for (const tc of resp.tool_calls) {
               setToolActivity(TOOL_LABELS[tc.function.name] ?? `Using ${tc.function.name}…`);
+              const mutatingTool = ['create_student', 'update_student', 'delete_student', 'record_fee_payment', 'add_loan'].includes(tc.function.name);
+              const approved = !mutatingTool || await requestApproval(tc.function.name, tc.function.arguments);
+              if (!approved) {
+                working = [
+                  ...working,
+                  { role: 'tool', tool_call_id: tc.id, content: 'The administrator cancelled this action. Do not execute it.' },
+                ];
+                continue;
+              }
               const result = executeTool(
                 { name: tc.function.name, arguments: tc.function.arguments },
                 actions
@@ -377,6 +400,20 @@ export default function AssistantModule({ actions, readOnly }: AssistantModulePr
             </button>
           </div>
         </div>
+
+        {approval && (
+          <div className="fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-neutral-200 p-5">
+              <h3 className="font-bold text-neutral-900">Approve AI action?</h3>
+              <p className="text-xs text-neutral-500 mt-1">The AI wants to run: <strong>{TOOL_LABELS[approval.name] || approval.name}</strong></p>
+              <pre className="mt-3 max-h-48 overflow-auto rounded-lg bg-neutral-100 p-3 text-[11px] text-neutral-700 whitespace-pre-wrap">{approval.argumentsText}</pre>
+              <div className="mt-4 flex justify-end gap-2">
+                <button onClick={() => resolveApproval(false)} className="px-4 py-2 rounded-lg border border-neutral-300 text-xs font-bold">Cancel</button>
+                <button onClick={() => resolveApproval(true)} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-xs font-bold">Approve &amp; Apply</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

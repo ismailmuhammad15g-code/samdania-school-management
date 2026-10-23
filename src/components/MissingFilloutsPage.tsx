@@ -17,6 +17,7 @@ export default function MissingFilloutsPage({ students, academicClasses, onSaveS
   const [search, setSearch] = useState('');
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [contactDrafts, setContactDrafts] = useState<Record<string, string>>({});
+  const [photoLinkDrafts, setPhotoLinkDrafts] = useState<Record<string, string>>({});
 
   const missingStudents = useMemo(() => students.filter((student) => {
     const department = (student as Student & { department?: string }).department || '';
@@ -48,6 +49,13 @@ export default function MissingFilloutsPage({ students, academicClasses, onSaveS
     setContactDrafts((current) => { const next = { ...current }; delete next[student.id]; return next; });
   };
 
+  const savePhotoLink = (student: Student) => {
+    const photoUrl = photoLinkDrafts[student.id]?.trim();
+    if (!photoUrl || readOnly) return;
+    onSaveStudent({ ...student, photoUrl, photo_url: photoUrl });
+    setPhotoLinkDrafts((current) => { const next = { ...current }; delete next[student.id]; return next; });
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div><h2 className="text-xl font-bold text-[#2c332d]">Missing Fillouts</h2><p className="text-xs text-stone-500 mt-1">Students missing a profile photo or guardian contact information.</p></div>
@@ -63,6 +71,8 @@ export default function MissingFilloutsPage({ students, academicClasses, onSaveS
           <div className="flex-1"><h3 className="font-bold text-sm">{student.name}</h3><p className="text-xs text-stone-500">Class: {student.class} | Roll: {student.roll}</p><p className="text-xs text-red-600 mt-1">{!(student.photoUrl || student.photo_url) && 'Missing photo. '}{!student.contact?.trim() && 'Missing guardian contact.'}</p></div>
           {!readOnly && <div className="flex flex-wrap items-center gap-2">
             <label className="cursor-pointer inline-flex items-center gap-1.5 border border-stone-200 rounded-lg px-3 py-2 text-xs font-bold"><Upload className="h-3.5 w-3.5" /> {uploadingId === student.id ? 'Uploading...' : 'Upload Photo'}<input type="file" accept="image/*" className="hidden" disabled={uploadingId === student.id} onChange={(e) => uploadPhoto(student, e.target.files?.[0])} /></label>
+            <input aria-label="Student image link" type="url" value={photoLinkDrafts[student.id] || ''} onChange={(e) => setPhotoLinkDrafts({ ...photoLinkDrafts, [student.id]: e.target.value })} className="border border-stone-200 rounded-lg px-3 py-2 text-xs" />
+            <button onClick={() => savePhotoLink(student)} className="border border-stone-200 rounded-lg px-3 py-2 text-xs font-bold">Save Image Link</button>
             {!student.contact?.trim() && <><input value={contactDrafts[student.id] || ''} onChange={(e) => setContactDrafts({ ...contactDrafts, [student.id]: e.target.value })} className="border border-stone-200 rounded-lg px-3 py-2 text-xs" /><button onClick={() => saveContact(student)} className="bg-[#4a5d4e] text-white rounded-lg px-3 py-2 text-xs font-bold">Save Contact</button></>}
             <button onClick={() => onOpenEditStudent(student)} className="text-[#4a5d4e] border border-[#4a5d4e] rounded-lg px-3 py-2 text-xs font-bold">Edit</button>
           </div>}

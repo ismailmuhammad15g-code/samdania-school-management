@@ -48,6 +48,7 @@ interface SalariesModuleProps {
   onAddTeacherLeave: (entry: Omit<TeacherLeave, 'id'>) => void;
   onDeleteTeacherLeave: (id: string) => void;
   onAdminDeleteTeacher: (teacherId: string) => void;
+  onUpdateTeacherProfile: (accountId: string, patch: { fullName: string; designation: string; contact: string; email: string; bio: string; photoUrl?: string }) => void;
   attendanceQRSet: AttendanceQRSet | null;
   attendanceRecords: AttendanceRecord[];
   readOnly?: boolean;
@@ -70,11 +71,14 @@ export default function SalariesModule({
   onAddTeacherLeave,
   onDeleteTeacherLeave,
   onAdminDeleteTeacher,
+  onUpdateTeacherProfile,
   attendanceQRSet,
   attendanceRecords,
   readOnly
 }: SalariesModuleProps) {
-  const [activeTab, setActiveTab] = useState<'roster' | 'ledger' | 'unpaid' | 'disburse' | 'pendingreg' | 'teacherdetails' | 'attendance'>('roster');
+  const [activeTab, setActiveTab] = useState<'roster' | 'ledger' | 'unpaid' | 'disburse' | 'pendingreg' | 'teacheroverview' | 'teacherdetails' | 'attendance'>('roster');
+  const [profileTeacher, setProfileTeacher] = useState<TeacherAccount | null>(null);
+  const [profileDraft, setProfileDraft] = useState({ fullName: '', designation: '', contact: '', email: '', bio: '', photoUrl: '' });
 
   // Teacher photo lightbox (click any teacher avatar to enlarge)
   const [lightbox, setLightbox] = useState<{ src: string; name: string } | null>(null);
@@ -106,6 +110,20 @@ export default function SalariesModule({
     }
     onRejectTeacherAccount(rejectAccount.id, reason);
     setRejectAccount(null);
+  };
+
+  const openTeacherProfile = (teacher: TeacherAccount) => {
+    setProfileTeacher(teacher);
+    setProfileDraft({ fullName: teacher.fullName, designation: teacher.designation || '', contact: teacher.contact || '', email: teacher.email || '', bio: teacher.bio || '', photoUrl: teacher.photoUrl || '' });
+  };
+
+  const saveTeacherProfile = () => {
+    if (!profileTeacher || !profileDraft.fullName.trim() || !profileDraft.email.trim()) {
+      alert('Teacher name and email are required.');
+      return;
+    }
+    onUpdateTeacherProfile(profileTeacher.id, { ...profileDraft, fullName: profileDraft.fullName.trim(), designation: profileDraft.designation.trim(), contact: profileDraft.contact.trim(), email: profileDraft.email.trim(), bio: profileDraft.bio.trim(), photoUrl: profileDraft.photoUrl.trim() || undefined });
+    setProfileTeacher(null);
   };
 
   const pendingAccounts = useMemo(
@@ -329,6 +347,7 @@ export default function SalariesModule({
           { id: 'ledger' as const, icon: <Receipt className="h-3.5 w-3.5" />, label: 'Disbursement Ledger (হিসাব)', count: salaryPayments.length },
           { id: 'unpaid' as const, icon: <AlertCircle className="h-3.5 w-3.5" />, label: 'Pending (বকেয়া)', count: pendingStaff.length },
           { id: 'pendingreg' as const, icon: <UserPlus className="h-3.5 w-3.5" />, label: 'Pending Reg (নিবন্ধন)', count: pendingAccounts.length },
+          { id: 'teacheroverview' as const, icon: <User className="h-3.5 w-3.5" />, label: 'Teacher Overview', count: verifiedTeachers.length },
           { id: 'teacherdetails' as const, icon: <Users className="h-3.5 w-3.5" />, label: 'Teachers Details (শিক্ষক বিবরণ)', count: verifiedTeachers.length },
           { id: 'attendance' as const, icon: <CalendarCheck className="h-3.5 w-3.5" />, label: 'Attendance (উপস্থিতি)', count: attendanceRecords.filter((r) => r.date === (() => { const t = new Date(); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; })()).length },
         ].map(tab => (
@@ -822,6 +841,28 @@ export default function SalariesModule({
               );
             })
           )}
+        </div>
+      )}
+
+      {activeTab === 'teacheroverview' && (
+        <div className="grid gap-3">
+          {verifiedTeachers.length === 0 && <div className="bg-white rounded-xl border border-stone-200 p-8 text-center text-xs text-stone-500">No verified teacher profiles found.</div>}
+          {verifiedTeachers.map((teacher) => (
+            <div key={teacher.id} className="bg-white rounded-xl border border-stone-200 shadow-sm p-4 flex flex-col sm:flex-row sm:items-center gap-4">
+              <TeacherAvatar account={teacher} size={52} onClick={teacher.photoUrl ? () => setLightbox({ src: teacher.photoUrl!, name: teacher.fullName }) : undefined} />
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-bold text-[#2c332d]">{teacher.fullName}</h3>
+                <p className="text-xs text-stone-500">{teacher.designation || 'No designation recorded'}</p>
+                <p className="text-xs text-stone-500 mt-1 flex flex-wrap gap-3">
+                  <a href={`tel:${teacher.contact || ''}`} className="inline-flex items-center gap-1"><Phone className="h-3 w-3" />{teacher.contact || 'No phone recorded'}</a>
+                  <a href={`https://wa.me/${(teacher.contact || '').replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-emerald-700">WhatsApp</a>
+                  <span className="inline-flex items-center gap-1"><Mail className="h-3 w-3" />{teacher.email}</span>
+                </p>
+                {teacher.bio && <p className="text-xs text-stone-600 mt-2 whitespace-pre-wrap">{teacher.bio}</p>}
+              </div>
+              {!readOnly && <button onClick={() => openTeacherProfile(teacher)} className="bg-[#4a5d4e] text-white rounded-lg px-3 py-2 text-xs font-bold">Edit Profile</button>}
+            </div>
+          ))}
         </div>
       )}
 
@@ -1395,6 +1436,23 @@ export default function SalariesModule({
               Confirm Reject (নিশ্চিত বাতিল)
             </button>
           </div>
+        </div>
+      </div>
+    )}
+
+    {profileTeacher && !readOnly && (
+      <div className="fixed inset-0 z-50 bg-black/45 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-xl border border-stone-200 w-full max-w-lg p-5 space-y-4">
+          <div className="flex items-center justify-between"><h3 className="text-sm font-bold">Edit Teacher Profile</h3><button onClick={() => setProfileTeacher(null)} className="text-stone-500" title="Close"><X className="h-4 w-4" /></button></div>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="text-xs font-bold">Full Name<input value={profileDraft.fullName} onChange={(e) => setProfileDraft({ ...profileDraft, fullName: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /></label>
+            <label className="text-xs font-bold">Designation<input value={profileDraft.designation} onChange={(e) => setProfileDraft({ ...profileDraft, designation: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /></label>
+            <label className="text-xs font-bold">Phone Number<input type="tel" value={profileDraft.contact} onChange={(e) => setProfileDraft({ ...profileDraft, contact: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /></label>
+            <label className="text-xs font-bold">Email<input type="email" value={profileDraft.email} onChange={(e) => setProfileDraft({ ...profileDraft, email: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /></label>
+            <label className="text-xs font-bold sm:col-span-2">Profile Image Link<input type="url" value={profileDraft.photoUrl} onChange={(e) => setProfileDraft({ ...profileDraft, photoUrl: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /></label>
+            <label className="text-xs font-bold sm:col-span-2">Bio<textarea value={profileDraft.bio} onChange={(e) => setProfileDraft({ ...profileDraft, bio: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal h-20" /></label>
+          </div>
+          <div className="flex justify-end gap-2"><button onClick={() => setProfileTeacher(null)} className="border rounded-lg px-4 py-2 text-xs font-bold">Cancel</button><button onClick={saveTeacherProfile} className="bg-[#4a5d4e] text-white rounded-lg px-4 py-2 text-xs font-bold">Save Teacher Profile</button></div>
         </div>
       </div>
     )}

@@ -64,7 +64,7 @@ export interface Snapshot {
  * Produce a full textual snapshot of the database. Used both to ground the
  * "Ask" mode system prompt and to answer read-only data questions.
  */
-export function buildSnapshot(): Snapshot {
+export function buildSnapshot(maxChars = 7000): Snapshot {
   const students = safeGet<StudentLite[]>('samdani_students', []);
   const payments = safeGet<any[]>('samdani_payments', []);
   const ledger = safeGet<any[]>('samdani_ledger', []);
@@ -176,7 +176,10 @@ export function buildSnapshot(): Snapshot {
   lines.push('Use ONLY the data above to answer. Do not invent students, invoices or amounts.');
   lines.push('When the user asks for a summary, totals, a specific student, a class list, or invoice details, answer precisely from this data.');
 
-  const text = lines.join('\n');
+  const fullText = lines.join('\n');
+  const text = fullText.length <= maxChars
+    ? fullText
+    : `${fullText.slice(0, Math.max(1000, maxChars - 260))}\n\n[Snapshot shortened to fit the AI request limit. Use read_data for complete live records.]\n\n${lines.slice(-4).join('\n')}`;
 
   return {
     text,

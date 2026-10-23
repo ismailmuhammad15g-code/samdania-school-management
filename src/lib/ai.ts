@@ -37,7 +37,11 @@ interface ChatOptions {
 
 const API_KEY = import.meta.env.VITE_GROQ_API_KEY ?? '';
 const BASE_URL = (import.meta.env.VITE_GROQ_BASE_URL ?? 'https://api.groq.com/openai/v1').replace(/\/+$/, '');
-const MODEL = import.meta.env.VITE_GROQ_MODEL ?? 'llama-3.3-70b-versatile';
+const FALLBACK_MODEL = 'llama-3.1-8b-instant';
+const configuredModel = import.meta.env.VITE_GROQ_MODEL?.trim();
+const MODEL = configuredModel && configuredModel !== 'llama-3.3-70b-versatile'
+  ? configuredModel
+  : FALLBACK_MODEL;
 
 export function isAiConfigured(): boolean {
   return Boolean(API_KEY && MODEL);
@@ -64,14 +68,20 @@ export async function groqChat(opts: ChatOptions): Promise<GroqMessage> {
     body.tool_choice = opts.toolChoice ?? 'auto';
   }
 
-  const res = await fetch(`${BASE_URL}/chat/completions`, {
+  const request = (requestBody: Record<string, unknown>) => fetch(`${BASE_URL}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${API_KEY}`,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify(requestBody),
   });
+
+  let res = await request(body);
+  if (res.status === 404 && body.model !== FALLBACK_MODEL) {
+    body.model = FALLBACK_MODEL;
+    res = await request(body);
+  }
 
   if (!res.ok) {
     let detail = '';

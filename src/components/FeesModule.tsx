@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Student, FeePayment, MONTHS, StudentAttendanceRecord } from '../types';
-import { generateFeeReceiptPDF, generateAttendanceInvoicePDF } from './PDFGenerator';
+import { generateFeeReceiptPDF } from './PDFGenerator';
 import PasswordConfirmModal from './PasswordConfirmModal';
 import { parseNumberWithBengaliSupport, normalizeForComparison, isClassMatch } from '../lib/digitUtils';
 import { useLiveStudentSearch } from '../lib/useLiveStudentSearch';
 import { uploadStudentPhoto } from '../lib/imgbb';
+import logo2 from '../assets/images/logo2.png';
 import { 
   Users, 
   Search, 
@@ -83,6 +84,8 @@ export default function FeesModule({
   // Monthly attendance invoice selector
   const [attendanceMonth, setAttendanceMonth] = useState<number>(new Date().getMonth());
   const [attendanceYear, setAttendanceYear] = useState<number>(new Date().getFullYear());
+  const [attendancePrintMenuOpen, setAttendancePrintMenuOpen] = useState(false);
+  const [attendancePrintMode, setAttendancePrintMode] = useState<'absent' | 'present' | 'all'>('all');
   const sortedStudentAttendance = [...studentAttendanceRecords].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const attendanceByClass = useMemo(() => {
     const groups = new Map<string, StudentAttendanceRecord[]>();
@@ -105,6 +108,27 @@ export default function FeesModule({
     () => studentAttendanceRecords.filter((r) => r.date.startsWith(attendanceMonthPrefix)),
     [studentAttendanceRecords, attendanceMonthPrefix]
   );
+  const attendancePrintRows = useMemo(() => {
+    const allowedClass = (value: string) => /^(shishu|শিশু|play|nursery|class\s*[1-5]|ক্লাস\s*[১-৫])$/i.test(value.trim());
+    const latestStatus = new Map<string, boolean>();
+    [...attendanceMonthRecords]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .forEach((record) => record.statuses.forEach((status) => {
+        if (!latestStatus.has(status.studentId)) latestStatus.set(status.studentId, status.present);
+      }));
+    return students
+      .filter((student) => allowedClass(student.class))
+      .map((student) => ({ ...student, present: latestStatus.get(student.id) === true }))
+      .filter((student) => attendancePrintMode === 'all' || (attendancePrintMode === 'present' ? student.present : !student.present));
+  }, [students, attendanceMonthRecords, attendancePrintMode]);
+
+  const printAttendance = (mode: 'absent' | 'present' | 'all') => {
+    setAttendancePrintMode(mode);
+    setAttendancePrintMenuOpen(false);
+    document.body.classList.add('printing-attendance');
+    window.addEventListener('afterprint', () => document.body.classList.remove('printing-attendance'), { once: true });
+    window.setTimeout(() => window.print(), 0);
+  };
   
   // Live search — fetches fresh from Supabase on every query (no stale cache UI)
   const {
@@ -174,9 +198,11 @@ export default function FeesModule({
   const [guardAction, setGuardAction] = useState<{ label: string; onConfirm: () => void } | null>(null);
   const [isStudentFormOpen, setIsStudentFormOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [receivedByOpen, setReceivedByOpen] = useState(false);
   const [studentPhotoUrl, setStudentPhotoUrl] = useState('');
+  const [studentPhotoLink, setStudentPhotoLink] = useState('');
   const [photoUploading, setPhotoUploading] = useState(false);
   const [studentFormData, setStudentFormData] = useState({
     name: '',
@@ -276,6 +302,7 @@ export default function FeesModule({
   // Open Add Student Form
   const handleOpenAddStudent = () => {
     setEditingStudent(null);
+    setEditingStudentId(null);
     setStudentFormData({
       name: '',
       roll: '',
@@ -294,12 +321,14 @@ export default function FeesModule({
       advancePaid: '0',
     });
     setStudentPhotoUrl('');
+    setStudentPhotoLink('');
     setIsStudentFormOpen(true);
   };
 
   // Open Edit Student Form
   const handleOpenEditStudent = (student: Student) => {
     setEditingStudent(student);
+    setEditingStudentId(student.id);
     setStudentFormData({
       name: student.name,
       roll: student.roll, // Already a string, preserve exactly as is
@@ -318,6 +347,7 @@ export default function FeesModule({
       advancePaid: student.advancePaid.toString(),
     });
     setStudentPhotoUrl(student.photoUrl || student.photo_url || '');
+    setStudentPhotoLink(student.photoUrl || student.photo_url || '');
     setIsStudentFormOpen(true);
   };
 
@@ -325,7 +355,9 @@ export default function FeesModule({
     if (!file) return;
     setPhotoUploading(true);
     try {
-      setStudentPhotoUrl(await uploadStudentPhoto(file));
+      const url = await uploadStudentPhoto(file);
+      setStudentPhotoUrl(url);
+      setStudentPhotoLink(url);
     } catch (error) {
       alert(error instanceof Error ? error.message : 'Photo upload failed.');
     } finally {
@@ -346,7 +378,7 @@ export default function FeesModule({
 
     // Validate unique roll number within the same class
     const duplicateRoll = students.find(
-      s => isClassMatch(s.class, studentFormData.class) && normalizeForComparison(s.roll) === normalizeForComparison(rollStr) && s.id !== editingStudent?.id
+      s => isClassMatch(s.class, studentFormData.class) && normalizeForComparison(s.roll) === normalizeForComparison(rollStr) && s.id !== editingStudentId
     );
     if (duplicateRoll) {
       alert(`Roll number "${rollStr}" already exists in ${studentFormData.class} (assigned to "${duplicateRoll.name}"). Please use a unique roll number.`);
@@ -361,8 +393,8 @@ export default function FeesModule({
       fatherName: studentFormData.fatherName,
       motherName: studentFormData.motherName,
       extraInfo: studentFormData.extraInfo,
-      photoUrl: studentPhotoUrl || undefined,
-      photo_url: studentPhotoUrl || undefined,
+      photoUrl: studentPhotoLink.trim() || studentPhotoUrl || undefined,
+      photo_url: studentPhotoLink.trim() || studentPhotoUrl || undefined,
       previousDue: parseNumberWithBengaliSupport(studentFormData.previousDue) || 0,
       currentMonthFee: parseNumberWithBengaliSupport(studentFormData.currentMonthFee) || 0,
       examFee: parseNumberWithBengaliSupport(studentFormData.examFee) || 0,
@@ -373,14 +405,19 @@ export default function FeesModule({
       advancePaid: parseNumberWithBengaliSupport(studentFormData.advancePaid) || 0,
     };
 
-    if (editingStudent) {
-      onEditStudent({ ...editingStudent, ...payload });
+    const currentEditingStudent = editingStudentId
+      ? students.find((student) => student.id === editingStudentId) || editingStudent
+      : null;
+
+    if (editingStudentId && currentEditingStudent) {
+      onEditStudent({ ...currentEditingStudent, ...payload, id: editingStudentId });
     } else {
       onAddStudent(payload);
     }
 
     setIsStudentFormOpen(false);
     setEditingStudent(null);
+    setEditingStudentId(null);
   };
 
   // Collect Payment Form Submit
@@ -1195,22 +1232,22 @@ export default function FeesModule({
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
-              <button
-                onClick={() => generateAttendanceInvoicePDF(attendanceMonthRecords, MONTHS[attendanceMonth], attendanceYear, { download: true })}
-                disabled={attendanceMonthRecords.length === 0}
-                className="flex items-center gap-1.5 bg-white hover:bg-[#f5f2ed] border border-stone-200 hover:border-[#4a5d4e] text-[#4a5d4e] text-[10px] font-bold px-2.5 py-2 rounded shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <FileText className="h-3 w-3 text-[#d9c5b2]" />
-                Download
-              </button>
-              <button
-                onClick={() => generateAttendanceInvoicePDF(attendanceMonthRecords, MONTHS[attendanceMonth], attendanceYear, { print: true })}
-                disabled={attendanceMonthRecords.length === 0}
-                className="flex items-center gap-1.5 bg-[#4a5d4e] hover:bg-[#3b4a3b] border border-[#4a5d4e] text-white text-[10px] font-bold px-2.5 py-2 rounded shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Printer className="h-3 w-3" />
-                Print
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setAttendancePrintMenuOpen((open) => !open)}
+                  disabled={students.length === 0}
+                  className="flex items-center gap-1.5 bg-[#4a5d4e] hover:bg-[#3b4a3b] border border-[#4a5d4e] text-white text-[10px] font-bold px-2.5 py-2 rounded shadow-sm transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Printer className="h-3 w-3" /> Print <ChevronDown className="h-3 w-3" />
+                </button>
+                {attendancePrintMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-20 w-36 bg-white border border-stone-200 rounded-lg shadow-lg p-1">
+                    <button onClick={() => printAttendance('absent')} className="w-full text-left px-3 py-2 rounded text-[10px] font-bold text-red-700 hover:bg-red-50">Absent Print</button>
+                    <button onClick={() => printAttendance('present')} className="w-full text-left px-3 py-2 rounded text-[10px] font-bold text-emerald-700 hover:bg-emerald-50">Present Print</button>
+                    <button onClick={() => printAttendance('all')} className="w-full text-left px-3 py-2 rounded text-[10px] font-bold text-stone-700 hover:bg-stone-100">All Print</button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1291,7 +1328,7 @@ export default function FeesModule({
             <div className="bg-[#4a5d4e] text-stone-100 p-4 border-b border-[#3d4d41] flex justify-between items-center">
               <h3 className="font-serif font-bold text-sm flex items-center gap-1.5">
                 <UserCheck className="h-4.5 w-4.5 text-[#d9c5b2]" />
-                {editingStudent ? 'Edit Student Profile' : 'Register New Student'}
+                {editingStudentId ? 'Edit Student Profile' : 'Register New Student'}
               </h3>
               <button
                 onClick={() => setIsStudentFormOpen(false)}
@@ -1357,6 +1394,7 @@ export default function FeesModule({
                     <input type="file" accept="image/*" className="hidden" disabled={photoUploading} onChange={(e) => handleStudentPhotoChange(e.target.files?.[0])} />
                   </label>
                   {studentPhotoUrl && <img src={studentPhotoUrl} alt="Student profile" className="mt-2 h-14 w-14 rounded-lg object-cover border border-stone-200" />}
+                  <input aria-label="Student profile image link" type="url" value={studentPhotoLink} onChange={(e) => { setStudentPhotoLink(e.target.value); setStudentPhotoUrl(e.target.value); }} className="mt-2 w-full bg-stone-50 border border-stone-200 rounded-lg text-xs px-3 py-2" />
                 </div>
 
                 {/* Parent Information (অভিভাবকের তথ্য) */}
@@ -1486,7 +1524,7 @@ export default function FeesModule({
                   type="submit"
                   className="bg-[#4a5d4e] hover:bg-[#3d4d41] text-white text-xs font-bold px-5 py-2 rounded-lg shadow-sm active:scale-95 cursor-pointer border border-[#3d4d41]"
                 >
-                  {editingStudent ? 'Save Student Profile' : 'Register Profile'}
+                  {editingStudentId ? 'Update Student Profile' : 'Register Profile'}
                 </button>
               </div>
 
@@ -1682,6 +1720,32 @@ export default function FeesModule({
         onConfirm={guardAction.onConfirm}
         actionLabel={guardAction.label}
       />
+    )}
+    {typeof document !== 'undefined' && createPortal(
+      <div id="attendance-print-container" aria-hidden="true">
+        <header className="attendance-print-header">
+          <img src={logo2} alt="Samdania Madrasah logo" />
+          <div className="attendance-print-institution">
+            <h1>সামদানীয়া তা'লীমুল ইসলাম মাদ্রাসা</h1>
+            <p>المدرسة الصمدانية للتعليم الإسلامي بالغلا جيبة</p>
+            <span>Pir Badrul Islam Samdani Complex, Khankah-e-Furfura Sharif, Darul Aman, Word 02, Golachipa, Patuakhali.</span>
+          </div>
+          <div className="attendance-print-contact">
+            <strong>মোবাইল: +8801792776433</strong>
+            <span>পীর বদরুল ইসলাম সামদানী কমপ্লেক্স<br />গলাচিপা, পটুয়াখালী</span>
+          </div>
+        </header>
+        <div className="attendance-print-title">Class Attendance - {attendancePrintMode === 'absent' ? 'Absent' : attendancePrintMode === 'present' ? 'Present' : 'All'} Students · {MONTHS[attendanceMonth]} {attendanceYear}</div>
+        <div className="attendance-print-list">
+          {attendancePrintRows.map((student) => (
+            <div className="attendance-print-row" key={student.id}>
+              <strong>{student.name}</strong><span>Class: {student.class}</span><span>Roll: {student.roll}</span><span>Phone: {student.contact || '—'}</span><span className={student.present ? 'attendance-present' : 'attendance-absent'}>{student.present ? 'Present' : 'Absent'}</span>
+            </div>
+          ))}
+          {attendancePrintRows.length === 0 && <p>No students found for this attendance filter.</p>}
+        </div>
+      </div>,
+      document.body
     )}
     {typeof document !== 'undefined' && createPortal(
       <div id="print-slips-container" aria-hidden="true">
