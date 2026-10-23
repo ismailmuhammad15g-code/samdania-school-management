@@ -13,6 +13,7 @@ import {
   PieChart as PieIcon,
   CalendarDays,
   CalendarRange,
+  Search,
   Trash2,
   Tag
 } from 'lucide-react';
@@ -183,6 +184,8 @@ const DEFAULT_EXPENSE_CATEGORIES = ['Teacher Salary', 'Utilities', 'Rent', 'Food
 
 export default function HifzFinanceModule({ ledger, onAddTransaction, readOnly }: HifzFinanceModuleProps) {
   const [addOpen, setAddOpen] = useState(false);
+  const [transactionSearch, setTransactionSearch] = useState('');
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState<'All' | 'Income' | 'Expense'>('All');
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
     type: 'Income' as 'Income' | 'Expense',
@@ -223,6 +226,25 @@ export default function HifzFinanceModule({ ledger, onAddTransaction, readOnly }
   const yearlyStats = useMemo(() => groupByPeriod(ledger, 'year'), [ledger]);
   const incomeBreakdown = useMemo(() => categoryBreakdown(ledger, 'Income'), [ledger]);
   const expenseBreakdown = useMemo(() => categoryBreakdown(ledger, 'Expense'), [ledger]);
+  const filteredTransactions = useMemo(() => {
+    const query = transactionSearch.trim().toLocaleLowerCase();
+    return [...ledger]
+      .filter((transaction) => transactionTypeFilter === 'All' || transaction.type === transactionTypeFilter)
+      .filter((transaction) => {
+        if (!query) return true;
+        return [
+          transaction.id,
+          transaction.date,
+          transaction.type,
+          transaction.category,
+          transaction.description,
+          transaction.fund,
+          transaction.recordedBy,
+          String(transaction.amount),
+        ].some((value) => String(value ?? '').toLocaleLowerCase().includes(query));
+      })
+      .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  }, [ledger, transactionSearch, transactionTypeFilter]);
 
   const openAdd = () => {
     setForm({
@@ -269,13 +291,17 @@ export default function HifzFinanceModule({ ledger, onAddTransaction, readOnly }
       alert('Please enter a valid amount.');
       return;
     }
+    if (!form.description.trim()) {
+      alert('Please enter the source of the income or the purpose of the expense.');
+      return;
+    }
     onAddTransaction({
       date: form.date,
       type: form.type,
       fund: 'General',
       category: form.category,
       amount: amt,
-      description: form.description || `${form.type} — ${form.category}`,
+      description: form.description.trim(),
     });
     setAddOpen(false);
   };
@@ -473,6 +499,89 @@ export default function HifzFinanceModule({ ledger, onAddTransaction, readOnly }
         </div>
       </div>
 
+      {/* Detailed transaction ledger */}
+      <section className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+        <div className="flex flex-col gap-3 border-b border-stone-100 bg-gradient-to-r from-[#f5f2ed] to-[#fbf9f6] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-serif font-bold text-[#2c332d]">Detailed Income &amp; Expense Ledger</h3>
+            <p className="mt-1 text-[11px] text-stone-500">Transaction date, category, source or purpose, amount, fund, and recorder.</p>
+          </div>
+          <span className="text-[11px] font-semibold text-stone-500">{filteredTransactions.length} of {ledger.length} transactions</span>
+        </div>
+        <div className="flex flex-col gap-2 border-b border-stone-100 p-4 sm:flex-row">
+          <label className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-stone-400" />
+            <input
+              type="search"
+              value={transactionSearch}
+              onChange={(event) => setTransactionSearch(event.target.value)}
+              placeholder="Search date, category, details, amount, or recorder"
+              className="w-full rounded-lg border border-stone-200 bg-white py-2 pl-9 pr-3 text-xs focus:border-[#4a5d4e] focus:outline-none"
+            />
+          </label>
+          <select
+            value={transactionTypeFilter}
+            onChange={(event) => setTransactionTypeFilter(event.target.value as 'All' | 'Income' | 'Expense')}
+            className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs"
+            aria-label="Filter transactions by type"
+          >
+            <option value="All">All transactions</option>
+            <option value="Income">Income only</option>
+            <option value="Expense">Expense only</option>
+          </select>
+        </div>
+        <div className="max-h-[70vh] overflow-auto">
+          <table className="w-full min-w-[850px] border-collapse text-xs">
+            <thead className="sticky top-0 z-10 bg-[#f5f2ed] text-stone-600">
+              <tr>
+                <th className="border-b border-stone-200 px-3 py-2.5 text-left font-semibold">Transaction ID</th>
+                <th className="border-b border-stone-200 px-3 py-2.5 text-left font-semibold">Date</th>
+                <th className="border-b border-stone-200 px-3 py-2.5 text-left font-semibold">Type</th>
+                <th className="border-b border-stone-200 px-3 py-2.5 text-left font-semibold">Category</th>
+                <th className="border-b border-stone-200 px-3 py-2.5 text-left font-semibold">Source / Purpose &amp; Details</th>
+                <th className="border-b border-stone-200 px-3 py-2.5 text-left font-semibold">Fund</th>
+                <th className="border-b border-stone-200 px-3 py-2.5 text-right font-semibold">Amount</th>
+                <th className="border-b border-stone-200 px-3 py-2.5 text-left font-semibold">Recorded By</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {filteredTransactions.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-3 py-10 text-center italic text-stone-400">
+                    {ledger.length ? 'No transactions match the current search or filter.' : 'No Hifz income or expense transactions have been recorded yet.'}
+                  </td>
+                </tr>
+              ) : filteredTransactions.map((transaction) => (
+                <tr key={transaction.id} className="align-top hover:bg-[#faf9f6]">
+                  <td className="whitespace-nowrap px-3 py-3 font-mono text-[10px] text-stone-500">
+                    {transaction.id || 'Not recorded'}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-3 font-mono text-stone-700">
+                    {transaction.date && !Number.isNaN(new Date(`${transaction.date}T00:00:00`).getTime())
+                      ? new Date(`${transaction.date}T00:00:00`).toLocaleDateString()
+                      : 'Date not recorded'}
+                  </td>
+                  <td className="px-3 py-3">
+                    <span className={`rounded-full px-2 py-1 text-[10px] font-bold ${transaction.type === 'Income' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                      {transaction.type}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 font-semibold text-stone-700">{transaction.category || 'Uncategorized'}</td>
+                  <td className="max-w-md whitespace-pre-wrap px-3 py-3 text-stone-600">
+                    {transaction.description?.trim() || <span className="italic text-amber-700">No source or purpose details were recorded.</span>}
+                  </td>
+                  <td className="px-3 py-3 text-stone-600">{transaction.fund || 'General'}</td>
+                  <td className={`whitespace-nowrap px-3 py-3 text-right font-mono font-bold ${transaction.type === 'Income' ? 'text-[#4a5d4e]' : 'text-[#b27d6d]'}`}>
+                    {fmt(transaction.amount)}
+                  </td>
+                  <td className="px-3 py-3 text-stone-600">{transaction.recordedBy || 'Not recorded'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       {/* Add Transaction Modal */}
       {addOpen && (
         <div className="fixed inset-0 bg-[#2c332d]/45 backdrop-blur-xs flex items-center justify-center p-4 z-50">
@@ -561,13 +670,14 @@ export default function HifzFinanceModule({ ledger, onAddTransaction, readOnly }
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-stone-700 mb-1">Description</label>
+                <label className="block text-[11px] font-bold text-stone-700 mb-1">Purpose / Source Details *</label>
                 <input
                   type="text"
+                  required
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   className="w-full bg-stone-50 text-xs border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#4a5d4e]"
-                  placeholder="Optional note"
+                  placeholder={form.type === 'Income' ? 'Where did this income come from?' : 'What was this expense used for?'}
                 />
               </div>
 
