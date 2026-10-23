@@ -82,6 +82,7 @@ export interface TeacherAccount {
   fullName: string;
   designation: string;
   email: string;
+  contact?: string;
   password: string;
   bio: string;
   registered: boolean;

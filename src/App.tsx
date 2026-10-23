@@ -1407,7 +1407,7 @@ export default function App() {
         )}
 
         {activeTab === 'appManagement' && (
-          <AppManagementPage readOnly={adminReadOnly} />
+          <AppManagementPage students={students} teacherStaff={teachersStaff} teacherAccounts={teacherAccounts} readOnly={adminReadOnly} />
         )}
 
         {activeTab === 'missingFillouts' && (
@@ -1553,7 +1553,7 @@ export default function App() {
           />
         )}
 
-        {activeTab === 'assitant' && (
+        {activeTab === 'assistant' && (
           <AssistantModule
             actions={assistantActions}
             readOnly={adminReadOnly}

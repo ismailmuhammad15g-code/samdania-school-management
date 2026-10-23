@@ -41,7 +41,7 @@ const NAV_ITEMS = [
   { id: 'results', label: 'Results', icon: GraduationCap },
   { id: 'loans', label: 'Loans', icon: PiggyBank },
   { id: 'settings', label: 'Settings', icon: Settings },
-  { id: 'assitant', label: 'Assistant', icon: Bot },
+  { id: 'assistant', label: 'Assistant', icon: Bot },
   { id: 'appManagement', label: 'App Management', icon: Megaphone },
   { id: 'missingFillouts', label: 'Missing Fillouts', icon: FileWarning },
 ];

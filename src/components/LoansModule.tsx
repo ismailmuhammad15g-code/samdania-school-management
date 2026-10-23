@@ -69,6 +69,23 @@ interface LoansModuleProps {
   readOnly?: boolean;
 }
 
+interface LoanStats {
+  totalTaken: number;
+  repaidTaken: number;
+  outstandingTaken: number;
+  totalGiven: number;
+  recoveredGiven: number;
+  outstandingGiven: number;
+  fundBalance: number;
+  zakatBalance: number;
+  lillahBalance: number;
+  zakatLillah: number;
+  activeCount: number;
+  settledCount: number;
+  totalLoans: number;
+  netPosition: number;
+}
+
 export default function LoansModule({
   loans,
   loanPayments,
@@ -90,7 +107,7 @@ export default function LoansModule({
   const [editingLoan, setEditingLoan] = useState<LoanRecord | null>(null);
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
-    type: 'Given' as 'Taken' | 'Given',
+    type: 'Given' as LoanRecord['type'],
     personName: '',
     contact: '',
     amount: '',
@@ -107,7 +124,7 @@ export default function LoansModule({
   const [viewLoan, setViewLoan] = useState<LoanRecord | null>(null);
 
   // ── Computed Stats ──
-  const stats = useMemo(() => {
+  const stats = useMemo<LoanStats>(() => {
     const takenLoans = loans.filter(l => l.type === 'Taken');
     const givenLoans = loans.filter(l => l.type === 'Given');
     
@@ -508,7 +525,7 @@ function QuickAction({ icon, label, bn, onClick, color }: {
 
 /* ═══ OVERVIEW TAB ═══ */
 interface OverviewTabProps {
-  stats: ReturnType<typeof useMemo>;
+  stats: LoanStats;
   loans: LoanRecord[];
   onRepay: (loan: LoanRecord) => void;
 }
@@ -807,7 +824,7 @@ function PaymentsTab({ loans, loanPayments }: PaymentsTabProps) {
 interface SummaryTabProps {
   loans: LoanRecord[];
   loanPayments: LoanPayment[];
-  stats: ReturnType<typeof useMemo>;
+  stats: LoanStats;
 }
 function SummaryTab({ loans, loanPayments, stats }: SummaryTabProps) {
   const monthlyData = useMemo(() => {
