@@ -50,9 +50,25 @@ export default function DescriptiveReportTab({ ledger }: Props) {
   const generate = () => setGenerated(true);
   const print = () => {
     setGenerated(true);
-    document.body.classList.add('printing-report');
-    window.addEventListener('afterprint', () => document.body.classList.remove('printing-report'), { once: true });
-    window.setTimeout(() => window.print(), 0);
+    window.setTimeout(() => {
+      const report = document.getElementById('report-output-container');
+      if (!report) {
+        alert('The report is not ready to print. Please generate it and try again.');
+        return;
+      }
+
+      document.getElementById('report-output-print-clone')?.remove();
+      const printClone = report.cloneNode(true) as HTMLElement;
+      printClone.id = 'report-output-print-clone';
+      document.body.appendChild(printClone);
+      document.body.classList.add('printing-report');
+      const cleanup = () => {
+        printClone.remove();
+        document.body.classList.remove('printing-report');
+      };
+      window.addEventListener('afterprint', cleanup, { once: true });
+      window.setTimeout(() => window.print(), 50);
+    }, 0);
   };
   const percent = (amount: number) => totalIncome ? `${toBengaliDigits(((amount / totalIncome) * 100).toFixed(1))}%` : '০%';
 
