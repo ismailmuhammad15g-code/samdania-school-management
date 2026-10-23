@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ScanLine, CheckCircle2, LogIn, LogOut, XCircle, Clock, AlertTriangle, Fingerprint, Loader2 } from 'lucide-react';
+import { ScanLine, CheckCircle2, LogIn, LogOut, XCircle, Clock, AlertTriangle, Fingerprint, Loader2, CalendarOff } from 'lucide-react';
 import QrScanner from './QrScanner';
 import { playBeep, type AttendanceScanResult } from '../lib/attendance';
 import { AttendanceQRSet, AttendanceRecord } from '../types';
@@ -79,6 +79,14 @@ export default function AttendanceSection({ qrSet, todayRecord, onScan }: Attend
             title: 'Wrong QR Code (ভুল কোড)',
             sub: 'This QR is not for today',
             detail: `Scanned code belongs to ${result.qrDate}. Please scan today's QR.`,
+            tone: 'amber' as const,
+          };
+        case 'onleave':
+          return {
+            icon: <CalendarOff className="h-9 w-9 text-amber-600" />,
+            title: 'You Are on Approved Leave',
+            sub: 'আজ আপনার ছুটি অনুমোদিত হয়েছে',
+            detail: 'Attendance cannot be recorded during approved leave.',
             tone: 'amber' as const,
           };
         case 'invalid':

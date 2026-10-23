@@ -125,6 +125,7 @@ export type AttendanceScanResult =
   | { status: 'departed'; time: string }           // second scan → left
   | { status: 'already'; entryTime: string; exitTime: string | null } // already recorded
   | { status: 'wrongday'; qrDate: string }         // QR not for today
+  | { status: 'onleave' }                          // approved leave covers today
   | { status: 'invalid' };                         // forged / unrecognised
 
 // Start of the current ISO week (Monday 00:00 local).

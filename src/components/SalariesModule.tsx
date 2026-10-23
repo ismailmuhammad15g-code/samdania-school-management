@@ -47,6 +47,7 @@ interface SalariesModuleProps {
   teacherLeaves: TeacherLeave[];
   onAddTeacherLeave: (entry: Omit<TeacherLeave, 'id'>) => void;
   onDeleteTeacherLeave: (id: string) => void;
+  onDecideTeacherLeave: (id: string, status: 'approved' | 'denied', adminNote?: string) => void;
   onAdminDeleteTeacher: (teacherId: string) => void;
   onUpdateTeacherProfile: (accountId: string, patch: { fullName: string; designation: string; contact: string; email: string; bio: string; photoUrl?: string }) => void;
   attendanceQRSet: AttendanceQRSet | null;
@@ -70,6 +71,7 @@ export default function SalariesModule({
   teacherLeaves,
   onAddTeacherLeave,
   onDeleteTeacherLeave,
+  onDecideTeacherLeave,
   onAdminDeleteTeacher,
   onUpdateTeacherProfile,
   attendanceQRSet,
@@ -174,6 +176,7 @@ export default function SalariesModule({
   // Leave (ছুটি) modal state
   const [leaveTeacher, setLeaveTeacher] = useState<TeacherAccount | null>(null);
   const [leaveDraft, setLeaveDraft] = useState({ startDate: '', endDate: '', notes: '' });
+  const [leaveDecisionNotes, setLeaveDecisionNotes] = useState<Record<string, string>>({});
   const todayStr = (() => {
     const t = new Date();
     return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
@@ -198,7 +201,9 @@ export default function SalariesModule({
       teacherId: leaveTeacher.id,
       startDate: leaveDraft.startDate,
       endDate: leaveDraft.endDate,
-      notes: leaveDraft.notes.trim()
+      notes: leaveDraft.notes.trim(),
+      status: 'approved',
+      decidedAt: new Date().toISOString()
     });
     setLeaveTeacher(null);
   };
@@ -207,7 +212,7 @@ export default function SalariesModule({
 
   const activeLeaveFor = (teacherId: string): TeacherLeave | undefined =>
     teacherLeaves.find(
-      (l) => l.teacherId === teacherId && l.startDate <= todayStr && todayStr <= l.endDate
+      (l) => l.teacherId === teacherId && (l.status === undefined || l.status === 'approved') && l.startDate <= todayStr && todayStr <= l.endDate
     );
 
   const [selectedStaff, setSelectedStaff] = useState<TeacherStaff | null>(null);
@@ -868,18 +873,70 @@ export default function SalariesModule({
 
       {/* ===== TAB: ATTENDANCE REPORT (উপস্থিতি) ===== */}
       {activeTab === 'attendance' && (
-        <AttendanceReportTab
-          teachers={verifiedTeachers.map((a) => ({
-            id: a.id,
-            fullName: a.fullName,
-            designation: a.designation,
-            photoUrl: a.photoUrl,
-            role: a.role,
-            email: a.email,
-          }))}
-          records={attendanceRecords}
-          qrSet={attendanceQRSet}
-        />
+        <div className="space-y-5">
+          <div className="bg-white rounded-xl border border-stone-200 shadow-sm overflow-hidden">
+            <div className="bg-indigo-50 border-b border-indigo-100 px-4 py-3">
+              <h3 className="text-sm font-serif font-bold text-indigo-900">Leave Requests (ছুটির আবেদন)</h3>
+              <p className="text-[11px] text-indigo-700 mt-0.5">Approve or deny requests. Only administrators can remove an approved leave.</p>
+            </div>
+            <div className="p-4 space-y-3">
+              {teacherLeaves.filter((leave) => leave.status === 'pending').length === 0 ? (
+                <p className="text-xs text-stone-500">No pending leave requests.</p>
+              ) : (
+                teacherLeaves.filter((leave) => leave.status === 'pending').map((leave) => {
+                  const teacher = teacherAccounts.find((account) => account.id === leave.teacherId);
+                  return (
+                    <div key={leave.id} className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 space-y-2">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-bold text-[#2c332d]">{teacher?.fullName || 'Unknown teacher'}</p>
+                          <p className="text-[11px] text-stone-600">{leave.startDate} → {leave.endDate}</p>
+                          {leave.notes && <p className="text-[11px] text-stone-600 mt-1">Teacher note: {leave.notes}</p>}
+                        </div>
+                        <span className="text-[10px] font-bold text-indigo-700">Pending confirmation</span>
+                      </div>
+                      <textarea
+                        value={leaveDecisionNotes[leave.id] || ''}
+                        onChange={(e) => setLeaveDecisionNotes((prev) => ({ ...prev, [leave.id]: e.target.value }))}
+                        rows={2}
+                        placeholder="Admin message (optional)…"
+                        className="w-full rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs resize-none"
+                      />
+                      {!readOnly && (
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <button
+                            onClick={() => { onDecideTeacherLeave(leave.id, 'denied', leaveDecisionNotes[leave.id]); setLeaveDecisionNotes((prev) => { const next = { ...prev }; delete next[leave.id]; return next; }); }}
+                            className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-2 rounded-lg cursor-pointer"
+                          >
+                            Deny (বাতিল)
+                          </button>
+                          <button
+                            onClick={() => { onDecideTeacherLeave(leave.id, 'approved', leaveDecisionNotes[leave.id]); setLeaveDecisionNotes((prev) => { const next = { ...prev }; delete next[leave.id]; return next; }); }}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-2 rounded-lg cursor-pointer"
+                          >
+                            Approve (অনুমোদন)
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+          <AttendanceReportTab
+            teachers={verifiedTeachers.map((a) => ({
+              id: a.id,
+              fullName: a.fullName,
+              designation: a.designation,
+              photoUrl: a.photoUrl,
+              role: a.role,
+              email: a.email,
+            }))}
+            records={attendanceRecords}
+            qrSet={attendanceQRSet}
+          />
+        </div>
       )}
 
       {/* ===== TAB 4: DISBURSEMENT FORM ===== */}

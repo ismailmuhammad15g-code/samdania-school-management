@@ -160,6 +160,10 @@ export interface TeacherLeave {
   startDate: string; // YYYY-MM-DD
   endDate: string;   // YYYY-MM-DD
   notes?: string;
+  status?: 'pending' | 'approved' | 'denied';
+  adminNote?: string;
+  requestedAt?: string;
+  decidedAt?: string;
 }
 
 // --- TEACHER ATTENDANCE (উপস্থিতি) TYPES ---
@@ -269,4 +273,3 @@ export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
-

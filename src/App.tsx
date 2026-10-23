@@ -839,7 +839,8 @@ export default function App() {
     setTeacherRoutines((prev) => prev.filter((r) => r.id !== id));
   };
 
-  // Teacher leave (ছুটি) handlers — managed by admin, viewed/cancelled by teacher
+  // Teacher leave (ছুটি) handlers. Teachers may request leave; only admins
+  // can approve, deny, or remove a leave.
   const handleAddTeacherLeave = (entry: Omit<TeacherLeave, 'id'>) => {
     const newLeave: TeacherLeave = {
       ...entry,
@@ -854,13 +855,32 @@ export default function App() {
       : 'A teacher';
     pushNotification({
       type: 'leave',
-      title: 'Leave applied',
-      message: `${leaveName} requested leave (${entry.startDate} → ${entry.endDate})`,
+      title: entry.status === 'pending' ? 'Leave requested' : 'Leave scheduled',
+      message: `${leaveName} ${entry.status === 'pending' ? 'requested' : 'was scheduled for'} leave (${entry.startDate} → ${entry.endDate})`,
     });
   };
 
   const handleDeleteTeacherLeave = (id: string) => {
     setTeacherLeaves((prev) => prev.filter((l) => l.id !== id));
+  };
+
+  const handleDecideTeacherLeave = (id: string, status: 'approved' | 'denied', adminNote?: string) => {
+    const leave = teacherLeaves.find((item) => item.id === id);
+    const teacher = leave
+      ? teacherAccounts.find((account) => account.id === leave.teacherId)
+      : undefined;
+    setTeacherLeaves((prev) => prev.map((leave) => (
+      leave.id === id
+        ? { ...leave, status, adminNote: adminNote?.trim() || undefined, decidedAt: new Date().toISOString() }
+        : leave
+    )));
+    if (leave) {
+      pushNotification({
+        type: 'leave',
+        title: `Leave ${status}`,
+        message: `${teacher?.fullName || 'Teacher'}'s leave request was ${status}.`,
+      });
+    }
   };
 
   // Toggle whether a teacher's monthly salary is revealed on their dashboard
@@ -886,9 +906,17 @@ export default function App() {
     teacherName: string,
     raw: string
   ): AttendanceScanResult => {
+    const today = todayISO();
+    const activeLeave = teacherLeaves.find((leave) =>
+      leave.teacherId === teacherId &&
+      (leave.status === undefined || leave.status === 'approved') &&
+      leave.startDate <= today &&
+      today <= leave.endDate
+    );
+    if (activeLeave) return { status: 'onleave' };
+
     const v = verifyScanned(attendanceQRSet, raw);
     if (!v.ok) return { status: 'invalid' };
-    const today = todayISO();
     if (v.date !== today) return { status: 'wrongday', qrDate: v.date };
 
     const id = `${teacherId}_${today}`;
@@ -1298,7 +1326,7 @@ export default function App() {
           academicClasses={academicClasses}
           studentAttendanceRecords={studentAttendanceRecords}
           onSubmitStudentAttendance={handleSubmitStudentAttendance}
-          onDeleteTeacherLeave={handleDeleteTeacherLeave}
+          onRequestTeacherLeave={handleAddTeacherLeave}
           salaryVisible={teacherSession ? salaryVisibleTeachers.includes(teacherSession.accountId) : false}
           onToggleSalaryVisible={handleToggleSalaryVisible}
           onOpenSettings={() => setTeacherView('settings')}
@@ -1469,6 +1497,7 @@ export default function App() {
             teacherLeaves={teacherLeaves}
             onAddTeacherLeave={handleAddTeacherLeave}
             onDeleteTeacherLeave={handleDeleteTeacherLeave}
+            onDecideTeacherLeave={handleDecideTeacherLeave}
             onAdminDeleteTeacher={handleAdminDeleteTeacher}
             attendanceQRSet={attendanceQRSet}
             attendanceRecords={attendanceRecords}

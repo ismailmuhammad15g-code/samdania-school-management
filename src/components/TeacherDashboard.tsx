@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import logo2 from '../assets/images/logo2.png';
-import { LogOut, BadgeCheck, DollarSign, Clock, Settings, CalendarClock, Eye, EyeOff, CalendarOff, X, XCircle, Users, Search, Lock, CheckCircle2, ChevronDown } from 'lucide-react';
+import { LogOut, BadgeCheck, DollarSign, Clock, Settings, CalendarClock, Eye, EyeOff, CalendarOff, X, XCircle, Users, Search, Lock, CheckCircle2, ChevronDown, Send } from 'lucide-react';
 import { TeacherAccount, TeacherPortalSession, TeacherStaff, TeacherRoutine, TeacherLeave, SalaryPayment, MONTHS, AttendanceQRSet, AttendanceRecord, Student, StudentAttendanceRecord, StudentAttendanceStatus } from '../types';
 import type { AttendanceScanResult } from '../lib/attendance';
 import { TeacherAvatar, PhotoLightbox } from './TeacherPhoto';
@@ -16,7 +16,7 @@ interface TeacherDashboardProps {
   leaves: TeacherLeave[];
   salaryPayments: SalaryPayment[];
   allTeachers: { id: string; fullName: string; designation: string; photoUrl?: string; role?: string; email: string }[];
-  onDeleteTeacherLeave: (id: string) => void;
+  onRequestTeacherLeave: (entry: Omit<TeacherLeave, 'id'>) => void;
   salaryVisible: boolean;
   onToggleSalaryVisible: (teacherId: string) => void;
   onOpenSettings: () => void;
@@ -31,7 +31,7 @@ interface TeacherDashboardProps {
   onSubmitStudentAttendance: (payload: { teacherId: string; teacherName: string; className: string; date: string; statuses: StudentAttendanceStatus[] }) => void;
 }
 
-export default function TeacherDashboard({ session, account, staffRecord, routines, leaves, salaryPayments, allTeachers, onDeleteTeacherLeave, salaryVisible, onToggleSalaryVisible, onOpenSettings, onLogout, onDeleteAccount, qrSet, todayRecord, onScan, students, academicClasses, studentAttendanceRecords, onSubmitStudentAttendance }: TeacherDashboardProps) {
+export default function TeacherDashboard({ session, account, staffRecord, routines, leaves, salaryPayments, allTeachers, onRequestTeacherLeave, salaryVisible, onToggleSalaryVisible, onOpenSettings, onLogout, onDeleteAccount, qrSet, todayRecord, onScan, students, academicClasses, studentAttendanceRecords, onSubmitStudentAttendance }: TeacherDashboardProps) {
   const initial = (account?.fullName || session.fullName || 'T').trim().charAt(0).toUpperCase();
   const myRoutines = routines.filter((r) => r.teacherId === account?.id);
   const isVerifiedTeacher = Boolean(account?.registered && account?.status === 'verified');
@@ -66,7 +66,15 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
     return new Date(y, m - 1, d);
   };
   const myLeave = account?.id
-    ? leaves.find((l) => l.teacherId === account.id && l.startDate <= todayISO && todayISO <= l.endDate)
+    ? leaves.find((l) => l.teacherId === account.id && (l.status === undefined || l.status === 'approved') && l.startDate <= todayISO && todayISO <= l.endDate)
+    : undefined;
+  const pendingLeave = account?.id
+    ? leaves.find((l) => l.teacherId === account.id && l.status === 'pending')
+    : undefined;
+  const deniedLeave = account?.id
+    ? [...leaves]
+        .filter((l) => l.teacherId === account.id && l.status === 'denied')
+        .sort((a, b) => (b.decidedAt || '').localeCompare(a.decidedAt || ''))[0]
     : undefined;
   const daysLeft = myLeave
     ? Math.max(0, Math.round((parseYMD(myLeave.endDate).getTime() - today.getTime()) / 86400000) + 1)
@@ -113,7 +121,9 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
     ? Math.min(100, Math.round((receivedThisMonth / staffRecord.baseSalary) * 100))
     : 0;
 
-  const [cancelStep, setCancelStep] = useState<'closed' | 'choose' | 'confirm'>('closed');
+  const [leaveRequestOpen, setLeaveRequestOpen] = useState(false);
+  const [leaveRequest, setLeaveRequest] = useState({ startDate: '', endDate: '', notes: '' });
+  const [leaveRequestError, setLeaveRequestError] = useState('');
   const [lightbox, setLightbox] = useState<{ src: string; name: string } | null>(null);
   const [routeNotice, setRouteNotice] = useState<string | null>(null);
 
@@ -375,7 +385,7 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
           </div>
         )}
 
-        {/* Leave banner OR Class Routines */}
+        {/* Leave status OR class routines */}
         {myLeave ? (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl shadow-sm p-4 sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -397,15 +407,22 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
                 {myLeave.notes && (
                   <p className="text-[11px] text-amber-600 mt-1">Notes (নোট): {myLeave.notes}</p>
                 )}
+                {myLeave.adminNote && (
+                  <p className="text-[11px] text-amber-700 mt-1 font-semibold">Admin message (অ্যাডমিন বার্তা): {myLeave.adminNote}</p>
+                )}
               </div>
-              <button
-                onClick={() => setCancelStep('choose')}
-                className="shrink-0 w-full sm:w-auto bg-white border border-amber-300 text-amber-700 text-xs font-bold px-3 py-2.5 rounded-lg hover:bg-amber-100 active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <CalendarClock className="h-3.5 w-3.5" />
-                Request Changing (পরিবর্তনের অনুরোধ)
-              </button>
             </div>
+          </div>
+        ) : pendingLeave ? (
+          <div className="bg-sky-50 border border-sky-200 rounded-2xl shadow-sm p-4 sm:p-5">
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="h-5 w-5 text-sky-600" />
+              <h2 className="text-sm font-serif font-bold text-sky-800">Leave request pending (ছুটির আবেদন অপেক্ষমাণ)</h2>
+            </div>
+            <p className="text-[11px] text-sky-700">
+              Requested period: {pendingLeave.startDate} → {pendingLeave.endDate}. The admin must approve it.
+            </p>
+            {pendingLeave.notes && <p className="text-[11px] text-sky-600 mt-1">Note: {pendingLeave.notes}</p>}
           </div>
         ) : (
           <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">
@@ -413,6 +430,25 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
               <CalendarClock className="h-4 w-4 text-[#4a5d4e]" />
               <h2 className="text-sm font-serif font-bold text-[#2c332d]">Class Routines (ক্লাস রুটিন)</h2>
             </div>
+            {isVerifiedTeacher && (
+              <button
+                onClick={() => {
+                  setLeaveRequest({ startDate: todayISO, endDate: todayISO, notes: '' });
+                  setLeaveRequestError('');
+                  setLeaveRequestOpen(true);
+                }}
+                className="mb-4 w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm active:scale-95 cursor-pointer border border-indigo-700 flex items-center justify-center gap-1.5"
+              >
+                <CalendarClock className="h-3.5 w-3.5" />
+                Request Leave (ছুটির আবেদন)
+              </button>
+            )}
+            {deniedLeave && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+                Your latest leave request ({deniedLeave.startDate} → {deniedLeave.endDate}) was denied.
+                {deniedLeave.adminNote && <span className="font-semibold"> Admin message: {deniedLeave.adminNote}</span>}
+              </div>
+            )}
             {isPendingRegistration ? (
               <p className="text-xs text-stone-500">
                 There is no class for you yet. Please register and get verified first to start teaching at Samdania Madrasah.
@@ -443,7 +479,7 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
 
         {/* Attendance (الحضور) — scan to mark arrival / departure.
             Always visible; once fully checked out it shows the recorded status. */}
-        {isVerifiedTeacher && (
+        {isVerifiedTeacher && !myLeave && (
           <>
             <AttendanceSection qrSet={qrSet} todayRecord={todayRecord} onScan={onScan} />
             <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5 space-y-4">
@@ -726,67 +762,75 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
 
         {/* Profile card removed — now shown in the Teacher Settings page */}
 
-        {/* Cancel-leave modal (two steps: choose → confirm) */}
-        {cancelStep !== 'closed' && myLeave && (
+        {/* Teacher leave request modal */}
+        {leaveRequestOpen && (
           <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-            onClick={() => setCancelStep('closed')}
+            onClick={() => setLeaveRequestOpen(false)}
           >
             <div
               className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-stone-200"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="px-5 py-4 border-b border-stone-100 flex items-center justify-between">
-                <h3 className="text-sm font-serif font-bold text-[#2c332d]">Request Changing (পরিবর্তনের অনুরোধ)</h3>
+                <h3 className="text-sm font-serif font-bold text-[#2c332d]">Request Leave (ছুটির আবেদন)</h3>
                 <button
-                  onClick={() => setCancelStep('closed')}
+                  onClick={() => setLeaveRequestOpen(false)}
                   className="p-1.5 hover:bg-stone-100 rounded-lg cursor-pointer transition-all text-stone-500"
                 >
                   <X className="h-5 w-5" />
                 </button>
               </div>
               <div className="p-5 space-y-4">
-                {cancelStep === 'choose' ? (
-                  <>
-                    <p className="text-xs text-stone-600">
-                      You currently have an active leave. To return to your class routine table, cancel your leave below.
-                    </p>
-                    <p className="text-xs text-stone-600">
-                      আপনার বর্তমানে একটি সক্রিয় ছুটি আছে। ক্লাস রুটিন টেবিলে ফিরতে নিচে ছুটি বাতিল করুন।
-                    </p>
-                    <button
-                      onClick={() => setCancelStep('confirm')}
-                      className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm active:scale-95 cursor-pointer border border-red-700 flex items-center justify-center gap-1.5"
-                    >
-                      <CalendarOff className="h-4 w-4" />
-                      Cancel my leave (rest) (আমার ছুটি বাতিল করুন)
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-xs text-stone-700 font-semibold">
-                      This will cancel your leave. You must attend from tomorrow if it is after 3:00 PM.
-                    </p>
-                    <p className="text-xs text-stone-600">
-                      এটি আপনার ছুটি বাতিল করবে। বিকাল ৩টার পর হলে আপনাকে আগামীকাল থেকে উপস্থিত থাকতে হবে।
-                    </p>
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => setCancelStep('closed')}
-                        className="bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold px-4 py-2.5 rounded-lg transition-all active:scale-95 cursor-pointer"
-                      >
-                        Keep Leave (ছুটি রাখুন)
-                      </button>
-                      <button
-                        onClick={() => { onDeleteTeacherLeave(myLeave.id); setCancelStep('closed'); }}
-                        className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm active:scale-95 cursor-pointer border border-red-700 flex items-center justify-center gap-1.5"
-                      >
-                        <CalendarOff className="h-4 w-4" />
-                        Confirm Cancel (নিশ্চিত বাতিল)
-                      </button>
-                    </div>
-                  </>
-                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <label className="text-[10px] font-bold text-stone-500">
+                    From (শুরুর তারিখ)
+                    <input type="date" value={leaveRequest.startDate} onChange={(e) => setLeaveRequest({ ...leaveRequest, startDate: e.target.value })} className="mt-1 w-full px-2.5 py-2 rounded-lg border border-stone-200 text-xs" />
+                  </label>
+                  <label className="text-[10px] font-bold text-stone-500">
+                    To (শেষ তারিখ)
+                    <input type="date" min={leaveRequest.startDate} value={leaveRequest.endDate} onChange={(e) => setLeaveRequest({ ...leaveRequest, endDate: e.target.value })} className="mt-1 w-full px-2.5 py-2 rounded-lg border border-stone-200 text-xs" />
+                  </label>
+                </div>
+                <label className="block text-[10px] font-bold text-stone-500">
+                  Note (নোট) — optional
+                  <textarea value={leaveRequest.notes} onChange={(e) => setLeaveRequest({ ...leaveRequest, notes: e.target.value })} rows={3} className="mt-1 w-full px-2.5 py-2 rounded-lg border border-stone-200 text-xs resize-none" placeholder="Reason for leave…" />
+                </label>
+                {leaveRequestError && <p className="text-[11px] text-red-600 font-semibold">{leaveRequestError}</p>}
+                <button
+                  onClick={() => {
+                    if (!account?.id || !leaveRequest.startDate || !leaveRequest.endDate) {
+                      setLeaveRequestError('Please select both dates.');
+                      return;
+                    }
+                    if (leaveRequest.startDate > leaveRequest.endDate) {
+                      setLeaveRequestError('The end date must be on or after the start date.');
+                      return;
+                    }
+                    const overlapsExisting = leaves.some((leave) =>
+                      leave.teacherId === account.id &&
+                      (leave.status === undefined || leave.status === 'pending' || leave.status === 'approved') &&
+                      leave.startDate <= leaveRequest.endDate &&
+                      leave.endDate >= leaveRequest.startDate
+                    );
+                    if (overlapsExisting) {
+                      setLeaveRequestError('These dates overlap an existing leave request.');
+                      return;
+                    }
+                    onRequestTeacherLeave({
+                      teacherId: account.id,
+                      startDate: leaveRequest.startDate,
+                      endDate: leaveRequest.endDate,
+                      notes: leaveRequest.notes.trim(),
+                      status: 'pending',
+                      requestedAt: new Date().toISOString(),
+                    });
+                    setLeaveRequestOpen(false);
+                  }}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Send className="h-3.5 w-3.5" /> Send Request (আবেদন পাঠান)
+                </button>
               </div>
             </div>
           </div>
