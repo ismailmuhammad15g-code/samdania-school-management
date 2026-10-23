@@ -20,7 +20,7 @@ import {
   StudentAttendanceStatus,
   TeacherResignationRequest
 } from './types';
-import { initDatabase, dbGet, dbSet, dbDelete, onDbChange } from './lib/localDb';
+import { initDatabase, dbGet, dbSet, dbDelete, dbRefreshKey, onDbChange } from './lib/localDb';
 import { pushNotification } from './lib/notifications';
 import { getSession, logoutAdmin, setAdminReadOnlyFlag, getAdminReadOnlyFlag, ensureAdminCredentials } from './lib/auth';
 import { verifyScanned, generateQRSet, todayISO, type AttendanceScanResult } from './lib/attendance';
@@ -864,6 +864,11 @@ export default function App() {
     setTeacherLeaves((prev) => prev.filter((l) => l.id !== id));
   };
 
+  const handleRefreshTeacherLeaves = useCallback(async () => {
+    await dbRefreshKey('samdani_teacher_leaves');
+    syncFromDb();
+  }, [syncFromDb]);
+
   const handleDecideTeacherLeave = (id: string, status: 'approved' | 'denied', adminNote?: string) => {
     const leave = teacherLeaves.find((item) => item.id === id);
     const teacher = leave
@@ -1498,6 +1503,7 @@ export default function App() {
             onAddTeacherLeave={handleAddTeacherLeave}
             onDeleteTeacherLeave={handleDeleteTeacherLeave}
             onDecideTeacherLeave={handleDecideTeacherLeave}
+            onRefreshTeacherLeaves={handleRefreshTeacherLeaves}
             onAdminDeleteTeacher={handleAdminDeleteTeacher}
             attendanceQRSet={attendanceQRSet}
             attendanceRecords={attendanceRecords}

@@ -29,7 +29,8 @@ import {
   CalendarPlus,
   CalendarCheck,
   XCircle,
-  Filter
+  Filter,
+  RefreshCw
 } from 'lucide-react';
 
 interface SalariesModuleProps {
@@ -49,6 +50,7 @@ interface SalariesModuleProps {
   onAddTeacherLeave: (entry: Omit<TeacherLeave, 'id'>) => void;
   onDeleteTeacherLeave: (id: string) => void;
   onDecideTeacherLeave: (id: string, status: 'approved' | 'denied', adminNote?: string) => void;
+  onRefreshTeacherLeaves: () => Promise<void>;
   onAdminDeleteTeacher: (teacherId: string) => void;
   onUpdateTeacherProfile: (accountId: string, patch: { fullName: string; designation: string; contact: string; email: string; bio: string; photoUrl?: string }) => void;
   attendanceQRSet: AttendanceQRSet | null;
@@ -73,6 +75,7 @@ export default function SalariesModule({
   onAddTeacherLeave,
   onDeleteTeacherLeave,
   onDecideTeacherLeave,
+  onRefreshTeacherLeaves,
   onAdminDeleteTeacher,
   onUpdateTeacherProfile,
   attendanceQRSet,
@@ -180,6 +183,7 @@ export default function SalariesModule({
   const [leaveDecisionNotes, setLeaveDecisionNotes] = useState<Record<string, string>>({});
   const [leaveHistoryTeacher, setLeaveHistoryTeacher] = useState('all');
   const [leaveHistoryStatus, setLeaveHistoryStatus] = useState<'all' | 'pending' | 'approved' | 'denied'>('all');
+  const [refreshingLeaves, setRefreshingLeaves] = useState(false);
   const todayStr = (() => {
     const t = new Date();
     return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
@@ -243,6 +247,13 @@ export default function SalariesModule({
      days: approvedLeaves.reduce((sum, leave) => sum + leaveDays(leave), 0),
     };
   }, [teacherLeaves]);
+
+  useEffect(() => {
+    if (activeTab !== 'attendance') return;
+    setRefreshingLeaves(true);
+    onRefreshTeacherLeaves()
+      .finally(() => setRefreshingLeaves(false));
+  }, [activeTab, onRefreshTeacherLeaves]);
 
   const [selectedStaff, setSelectedStaff] = useState<TeacherStaff | null>(null);
   const [disburseData, setDisburseData] = useState({
@@ -967,7 +978,17 @@ export default function SalariesModule({
                 <h3 className="text-sm font-serif font-bold text-[#2c332d]">Leave History (ছুটির ইতিহাস)</h3>
                 <p className="text-[11px] text-stone-500 mt-0.5">All requests, decisions, current leave, and total approved leave days.</p>
               </div>
-              <Filter className="h-4 w-4 text-stone-500" />
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-stone-500" />
+                <button
+                  onClick={() => { setRefreshingLeaves(true); onRefreshTeacherLeaves().finally(() => setRefreshingLeaves(false)); }}
+                  disabled={refreshingLeaves}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-[10px] font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-60"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${refreshingLeaves ? 'animate-spin' : ''}`} />
+                  Refresh
+                </button>
+              </div>
             </div>
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
