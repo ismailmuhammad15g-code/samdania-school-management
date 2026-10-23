@@ -75,6 +75,7 @@ export interface TeacherStaff {
   contact: string;
   email: string;
   bio: string;
+  joinedAt?: string;
 }
 
 export interface TeacherAccount {
@@ -268,5 +269,4 @@ export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
-
 

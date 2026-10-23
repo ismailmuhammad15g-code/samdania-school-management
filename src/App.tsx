@@ -711,6 +711,7 @@ export default function App() {
       contact: '',
       email: acc.email,
       bio: acc.bio,
+      joinedAt: new Date().toISOString(),
     };
     setTeachersStaff([...teachersStaff, newTeacher]);
     setTeacherAccounts((prev) => prev.map(a =>

@@ -73,8 +73,9 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
     : 0;
 
   // Keep the current-month figures for the progress display, but calculate
-  // Remaining from the first due month through the current month. A recorded
-  // historical payment is also a valid due-month anchor for older accounts.
+  // Remaining covers every salary month from the teacher's roster joining month
+  // through the current month. Existing roster records fall back to account
+  // creation because they predate the joinedAt field.
   const currentMonth = MONTHS[new Date().getMonth()];
   const currentYear = new Date().getFullYear();
   const currentMonthIndex = new Date().getMonth();
@@ -83,18 +84,12 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
         .filter((p) => p.teacherStaffId === staffRecord.id && p.month === currentMonth && p.year === currentYear)
         .reduce((sum, p) => sum + p.netPaid, 0)
     : 0;
-  const accountStart = account?.createdAt ? new Date(account.createdAt) : today;
-  const validAccountStart = Number.isNaN(accountStart.getTime()) ? today : accountStart;
-  const startYear = validAccountStart.getFullYear();
-  const startMonthIndex = validAccountStart.getMonth();
-  const firstSalaryMonth = staffRecord
-    ? salaryPayments
-        .filter((p) => p.teacherStaffId === staffRecord.id && MONTHS.indexOf(p.month) >= 0)
-        .reduce(
-          (first, p) => Math.min(first, p.year * 12 + MONTHS.indexOf(p.month)),
-          startYear * 12 + startMonthIndex
-        )
-    : startYear * 12 + startMonthIndex;
+  const joiningDate = staffRecord?.joinedAt || account?.createdAt;
+  const parsedJoiningDate = joiningDate ? new Date(joiningDate) : today;
+  const validJoiningDate = Number.isNaN(parsedJoiningDate.getTime()) ? today : parsedJoiningDate;
+  const startYear = validJoiningDate.getFullYear();
+  const startMonthIndex = validJoiningDate.getMonth();
+  const firstSalaryMonth = startYear * 12 + startMonthIndex;
   const currentSalaryMonth = currentYear * 12 + currentMonthIndex;
   const salaryMonthsElapsed = Math.max(1, currentSalaryMonth - firstSalaryMonth + 1);
   const paidThroughCurrentMonth = staffRecord
