@@ -6,6 +6,7 @@ import type { AttendanceScanResult } from '../lib/attendance';
 import { TeacherAvatar, PhotoLightbox } from './TeacherPhoto';
 import AttendanceSection from './AttendanceSection';
 import NotificationBell from './NotificationBell';
+import TeacherNoticeboard from './TeacherNoticeboard';
 import { isClassMatch } from '../lib/digitUtils';
 
 interface TeacherDashboardProps {
@@ -384,6 +385,8 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
             {routeNotice}
           </div>
         )}
+
+        {isVerifiedTeacher && <TeacherNoticeboard teacherId={account?.id} />}
 
         {/* Leave status OR class routines */}
         {myLeave ? (

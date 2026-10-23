@@ -1471,7 +1471,11 @@ export default function App() {
         )}
 
         {activeTab === 'appManagement' && (
-          <AppManagementPage readOnly={adminReadOnly} />
+          <AppManagementPage
+            readOnly={adminReadOnly}
+            teacherAccounts={teacherAccounts}
+            adminName={adminName}
+          />
         )}
 
         {activeTab === 'missingFillouts' && (

@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Bell, Megaphone, Plus, Send, Trash2 } from 'lucide-react';
 import { dbGet, dbSet, onDbChange } from '../lib/localDb';
 import { Student } from '../types';
+import { getTeacherNotices, saveTeacherNotices, type TeacherNotice } from '../lib/teacherNotices';
+import { TeacherAccount } from '../types';
 
 type Notice = {
   id: string;
@@ -21,9 +23,11 @@ function readNotices(): Notice[] {
 
 interface AppManagementPageProps {
   readOnly?: boolean;
+  teacherAccounts: TeacherAccount[];
+  adminName: string;
 }
 
-export default function AppManagementPage({ readOnly = false }: AppManagementPageProps) {
+export default function AppManagementPage({ readOnly = false, teacherAccounts, adminName }: AppManagementPageProps) {
   const [notices, setNotices] = useState<Notice[]>(readNotices);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -32,9 +36,19 @@ export default function AppManagementPage({ readOnly = false }: AppManagementPag
   const [pushTitle, setPushTitle] = useState('');
   const [pushMessage, setPushMessage] = useState('');
   const [message, setMessage] = useState('');
+  const [teacherNoticeTitle, setTeacherNoticeTitle] = useState('');
+  const [teacherNoticeMessage, setTeacherNoticeMessage] = useState('');
+  const [teacherNoticeTarget, setTeacherNoticeTarget] = useState<'all' | 'selected'>('all');
+  const [teacherNoticeRecipients, setTeacherNoticeRecipients] = useState<string[]>([]);
+  const [teacherNotices, setTeacherNotices] = useState<TeacherNotice[]>(getTeacherNotices);
 
   useEffect(() => {
     const refresh = () => setNotices(readNotices());
+    return onDbChange(refresh);
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => setTeacherNotices(getTeacherNotices());
     return onDbChange(refresh);
   }, []);
 
@@ -81,6 +95,38 @@ export default function AppManagementPage({ readOnly = false }: AppManagementPag
 
   const removeNotice = (id: string) => saveNotices(notices.filter((notice) => notice.id !== id));
 
+  const sendTeacherNotice = (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!teacherNoticeTitle.trim() || !teacherNoticeMessage.trim()) return;
+    if (teacherNoticeTarget === 'selected' && teacherNoticeRecipients.length === 0) {
+      setMessage('Select at least one teacher for a targeted notice.');
+      return;
+    }
+    const notice: TeacherNotice = {
+      id: `TNOTICE-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      title: teacherNoticeTitle.trim(),
+      message: teacherNoticeMessage.trim(),
+      createdAt: new Date().toISOString(),
+      target: teacherNoticeTarget,
+      recipientIds: teacherNoticeTarget === 'all' ? [] : teacherNoticeRecipients,
+      createdBy: adminName,
+    };
+    const next = [notice, ...teacherNotices];
+    saveTeacherNotices(next);
+    setTeacherNotices(next);
+    setTeacherNoticeTitle('');
+    setTeacherNoticeMessage('');
+    setTeacherNoticeTarget('all');
+    setTeacherNoticeRecipients([]);
+    setMessage('Teacher notice sent successfully.');
+  };
+
+  const removeTeacherNotice = (id: string) => {
+    const next = teacherNotices.filter((notice) => notice.id !== id);
+    saveTeacherNotices(next);
+    setTeacherNotices(next);
+  };
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div>
@@ -90,6 +136,28 @@ export default function AppManagementPage({ readOnly = false }: AppManagementPag
       {message && <p className="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-4 py-3">{message}</p>}
 
       <div className="grid lg:grid-cols-2 gap-6">
+        {!readOnly && <form onSubmit={sendTeacherNotice} className="bg-white border border-stone-200 rounded-xl p-5 space-y-4 lg:col-span-2">
+          <div className="flex items-center gap-2"><Megaphone className="h-4 w-4 text-[#4a5d4e]" /><h3 className="font-bold text-sm">Teacher Noticeboard</h3></div>
+          <div className="grid md:grid-cols-2 gap-3">
+            <input value={teacherNoticeTitle} onChange={(e) => setTeacherNoticeTitle(e.target.value)} required placeholder="Notice title" className="border border-stone-200 rounded-lg px-3 py-2 text-sm" />
+            <select value={teacherNoticeTarget} onChange={(e) => { setTeacherNoticeTarget(e.target.value as 'all' | 'selected'); setTeacherNoticeRecipients([]); }} className="border border-stone-200 rounded-lg px-3 py-2 text-sm">
+              <option value="all">Send to all teachers</option>
+              <option value="selected">Send to selected teachers</option>
+            </select>
+          </div>
+          {teacherNoticeTarget === 'selected' && (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {teacherAccounts.filter((account) => account.registered).map((account) => (
+                <label key={account.id} className="flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs">
+                  <input type="checkbox" checked={teacherNoticeRecipients.includes(account.id)} onChange={(e) => setTeacherNoticeRecipients((prev) => e.target.checked ? [...prev, account.id] : prev.filter((id) => id !== account.id))} />
+                  {account.fullName}
+                </label>
+              ))}
+            </div>
+          )}
+          <textarea value={teacherNoticeMessage} onChange={(e) => setTeacherNoticeMessage(e.target.value)} required placeholder="Notice message" className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm h-24" />
+          <button className="bg-[#4a5d4e] text-white rounded-lg px-4 py-2 text-xs font-bold flex items-center gap-2"><Send className="h-4 w-4" /> Send to Teacher Portal</button>
+        </form>}
         {!readOnly && <form onSubmit={addNotice} className="bg-white border border-stone-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2"><Megaphone className="h-4 w-4 text-[#4a5d4e]" /><h3 className="font-bold text-sm">Create Notice</h3></div>
           <div><label className="block text-xs font-bold text-stone-600 mb-1">Notice Title</label><input value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm" /></div>
@@ -106,6 +174,17 @@ export default function AppManagementPage({ readOnly = false }: AppManagementPag
           <button className="bg-[#4a5d4e] text-white rounded-lg px-4 py-2 text-xs font-bold flex items-center gap-2"><Send className="h-4 w-4" /> Send Notification</button>
         </form>}
       </div>
+
+      <section className="bg-white border border-stone-200 rounded-xl p-5">
+        <h3 className="font-bold text-sm mb-4">Teacher Notices</h3>
+        <div className="space-y-3">
+          {teacherNotices.length === 0 && <p className="text-xs text-stone-500">No teacher notices have been sent.</p>}
+          {teacherNotices.map((notice) => <article key={notice.id} className="border border-stone-200 rounded-lg p-3 flex items-start justify-between gap-4">
+            <div><h4 className="text-sm font-bold">{notice.title}</h4><p className="text-xs text-stone-600 mt-1 whitespace-pre-wrap">{notice.message}</p><time className="text-[10px] text-stone-400">{new Date(notice.createdAt).toLocaleString()} · {notice.target === 'all' ? 'All teachers' : `${notice.recipientIds.length} teacher(s)`}</time></div>
+            {!readOnly && <button title="Delete teacher notice" onClick={() => removeTeacherNotice(notice.id)} className="text-red-600 p-1"><Trash2 className="h-4 w-4" /></button>}
+          </article>)}
+        </div>
+      </section>
 
       <section className="bg-white border border-stone-200 rounded-xl p-5">
         <h3 className="font-bold text-sm mb-4">Published Notices</h3>
