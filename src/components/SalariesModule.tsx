@@ -4,6 +4,7 @@ import { TeacherAvatar, PhotoLightbox } from './TeacherPhoto';
 import AttendanceReportTab from './AttendanceReportTab';
 import PasswordConfirmModal from './PasswordConfirmModal';
 import { parseNumberWithBengaliSupport } from '../lib/digitUtils';
+import { getSalaryBalance } from '../lib/salary';
 import { BENGALI_MONTHS, formatBangladeshMobile, sendSchoolSms } from '../lib/sms';
 import { 
   Briefcase, 
@@ -37,7 +38,7 @@ import {
 const isNonTeachingPortalAccount = (account: TeacherAccount): boolean =>
   /\b(staff|driver|cleaner|guard|security|accountant|cook|caretaker|peon|janitor|maintenance|office)\b/i
     .test(`${account.role || ''} ${account.designation || ''}`);
-const SMS_API_URL = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3015';
+const SMS_API_URL = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3018';
 
 interface SalariesModuleProps {
   teachersStaff: TeacherStaff[];
@@ -61,7 +62,7 @@ interface SalariesModuleProps {
   onDecideTeacherLeave: (id: string, status: 'approved' | 'denied', adminNote?: string) => void;
   onRefreshTeacherLeaves: () => Promise<void>;
   onAdminDeleteTeacher: (teacherId: string) => void;
-  onUpdateTeacherProfile: (accountId: string, patch: { fullName: string; designation: string; contact: string; email: string; bio: string; photoUrl?: string }) => void;
+  onUpdateTeacherProfile: (accountId: string, patch: { fullName: string; designation: string; contact: string; email: string; bio: string; photoUrl?: string; baseSalary: number; salaryDue: number }) => void;
   attendanceQRSet: AttendanceQRSet | null;
   attendanceRecords: AttendanceRecord[];
   readOnly?: boolean;
@@ -98,7 +99,7 @@ function SalariesModuleContent({
 }: SalariesModuleProps) {
   const [activeTab, setActiveTab] = useState<'roster' | 'ledger' | 'unpaid' | 'disburse' | 'pendingreg' | 'teacheroverview' | 'teacherdetails' | 'attendance'>('roster');
   const [profileTeacher, setProfileTeacher] = useState<TeacherAccount | null>(null);
-  const [profileDraft, setProfileDraft] = useState({ fullName: '', designation: '', contact: '', email: '', bio: '', photoUrl: '' });
+  const [profileDraft, setProfileDraft] = useState({ fullName: '', designation: '', contact: '', email: '', bio: '', photoUrl: '', baseSalary: '', salaryDue: '' });
 
   // Teacher photo lightbox (click any teacher avatar to enlarge)
   const [lightbox, setLightbox] = useState<{ src: string; name: string } | null>(null);
@@ -134,8 +135,24 @@ function SalariesModuleContent({
   };
 
   const openTeacherProfile = (teacher: TeacherAccount) => {
+    const rosterEntry = teachersStaff.find((staff) =>
+      (staff.email && staff.email.toLowerCase() === teacher.email.toLowerCase()) ||
+      staff.name.toLowerCase() === teacher.fullName.toLowerCase()
+    );
+    const now = new Date();
     setProfileTeacher(teacher);
-    setProfileDraft({ fullName: teacher.fullName, designation: teacher.designation || '', contact: teacher.contact || '', email: teacher.email || '', bio: teacher.bio || '', photoUrl: teacher.photoUrl || '' });
+    setProfileDraft({
+      fullName: teacher.fullName,
+      designation: teacher.designation || '',
+      contact: teacher.contact || '',
+      email: teacher.email || '',
+      bio: teacher.bio || '',
+      photoUrl: teacher.photoUrl || '',
+      baseSalary: String(rosterEntry?.baseSalary ?? 0),
+      salaryDue: String(rosterEntry
+        ? getSalaryBalance(rosterEntry, salaryPayments, MONTHS[now.getMonth()], now.getFullYear(), teacher.createdAt).remaining
+        : 0),
+    });
   };
 
   const saveTeacherProfile = () => {
@@ -143,7 +160,31 @@ function SalariesModuleContent({
       alert('Teacher name and email are required.');
       return;
     }
-    onUpdateTeacherProfile(profileTeacher.id, { ...profileDraft, fullName: profileDraft.fullName.trim(), designation: profileDraft.designation.trim(), contact: profileDraft.contact.trim(), email: profileDraft.email.trim(), bio: profileDraft.bio.trim(), photoUrl: profileDraft.photoUrl.trim() || undefined });
+    const rosterEntry = teachersStaff.find((staff) =>
+      (staff.email && staff.email.toLowerCase() === profileTeacher.email.toLowerCase()) ||
+      staff.name.toLowerCase() === profileTeacher.fullName.toLowerCase()
+    );
+    if (!rosterEntry) {
+      alert('Register this teacher in the salary roster before editing salary amounts.');
+      return;
+    }
+    const baseSalary = parseNumberWithBengaliSupport(profileDraft.baseSalary);
+    const salaryDue = parseNumberWithBengaliSupport(profileDraft.salaryDue);
+    if (!Number.isFinite(baseSalary) || !Number.isFinite(salaryDue) || baseSalary < 0 || salaryDue < 0) {
+      alert('Enter valid non-negative amounts for running salary and due salary.');
+      return;
+    }
+    onUpdateTeacherProfile(profileTeacher.id, {
+      ...profileDraft,
+      fullName: profileDraft.fullName.trim(),
+      designation: profileDraft.designation.trim(),
+      contact: profileDraft.contact.trim(),
+      email: profileDraft.email.trim(),
+      bio: profileDraft.bio.trim(),
+      photoUrl: profileDraft.photoUrl.trim() || undefined,
+      baseSalary,
+      salaryDue,
+    });
     setProfileTeacher(null);
   };
 
@@ -332,9 +373,17 @@ function SalariesModuleContent({
   const handleDisburseSubmit = async () => {
     if (!selectedStaff) return;
 
-    const { totalDisbursed } = getMonthStatus(selectedStaff.id, disburseData.month, disburseData.year);
-    const remaining = Math.max(0, selectedStaff.baseSalary - totalDisbursed);
+    const linkedTeacher = teacherAccounts.find((account) =>
+      (selectedStaff.email && account.email.toLowerCase() === selectedStaff.email.toLowerCase()) ||
+      account.fullName.toLowerCase() === selectedStaff.name.toLowerCase()
+    );
+    const balance = getSalaryBalance(selectedStaff, salaryPayments, disburseData.month, disburseData.year, linkedTeacher?.createdAt);
+    const remaining = balance.remaining;
     const sendAmount = disburseAmount > 0 ? Math.min(disburseAmount, remaining) : remaining;
+    if (sendAmount <= 0) {
+      alert('There is no outstanding salary due through the selected month.');
+      return;
+    }
 
     onPaySalary({
       teacherStaffId: selectedStaff.id,
@@ -350,10 +399,6 @@ function SalariesModuleContent({
     });
 
     let resultMessage = `Disbursed ৳${sendAmount.toLocaleString()} to ${selectedStaff.name} for ${disburseData.month} ${disburseData.year}.`;
-    const linkedTeacher = teacherAccounts.find((account) =>
-      (selectedStaff.email && account.email.toLowerCase() === selectedStaff.email.toLowerCase()) ||
-      account.fullName.toLowerCase() === selectedStaff.name.toLowerCase()
-    );
     const recipient = formatBangladeshMobile(selectedStaff.contact || linkedTeacher?.contact || '');
     if (recipient) {
       setSendingSalarySms(true);
@@ -364,7 +409,7 @@ function SalariesModuleContent({
           `মাস: ${BENGALI_MONTHS[monthIndex] || disburseData.month} ${disburseData.year.toLocaleString('bn-BD')}`,
           `মোট বেতন: ৳${selectedStaff.baseSalary.toLocaleString('bn-BD')}`,
           `পরিশোধ: ৳${sendAmount.toLocaleString('bn-BD')}`,
-          `বকেয়া: ৳${Math.max(0, selectedStaff.baseSalary - totalDisbursed - sendAmount).toLocaleString('bn-BD')}`,
+          `বকেয়া: ৳${Math.max(0, remaining - sendAmount).toLocaleString('bn-BD')}`,
           'সামদানিয়া তালিমূল ইসলাম মাদ্রাসা।',
         ].join('\n');
         const sms = await sendSchoolSms(SMS_API_URL, [recipient], smsText);
@@ -1178,8 +1223,16 @@ function SalariesModuleContent({
 
       {/* ===== TAB 4: DISBURSEMENT FORM ===== */}
       {activeTab === 'disburse' && selectedStaff && !readOnly && (() => {
-        const { totalDisbursed } = getMonthStatus(selectedStaff.id, disburseData.month, disburseData.year);
-        const remaining = Math.max(0, selectedStaff.baseSalary - totalDisbursed);
+        const linkedTeacher = teacherAccounts.find((account) =>
+          (selectedStaff.email && account.email.toLowerCase() === selectedStaff.email.toLowerCase()) ||
+          account.fullName.toLowerCase() === selectedStaff.name.toLowerCase()
+        );
+        const balance = getSalaryBalance(selectedStaff, salaryPayments, disburseData.month, disburseData.year, linkedTeacher?.createdAt);
+        const totalDisbursed = balance.totalPaid;
+        const remaining = balance.remaining;
+        const disbursementPercent = balance.totalAccrued > 0
+          ? Math.min(100, Math.round((totalDisbursed / balance.totalAccrued) * 100))
+          : 0;
         const isFullyDisbursed = remaining <= 0;
         const sendingNow = disburseAmount > 0 ? Math.min(disburseAmount, remaining) : 0;
         const newRemaining = Math.max(0, remaining - sendingNow);
@@ -1286,14 +1339,14 @@ function SalariesModuleContent({
                 <div className="flex items-center justify-between text-[10px] mb-1">
                   <span className="font-bold text-stone-500">DISBURSEMENT STATUS</span>
                   <span className="font-mono font-bold" style={{ color: isFullyDisbursed ? '#059669' : totalDisbursed > 0 ? '#d97706' : '#dc2626' }}>
-                    {Math.round((totalDisbursed / selectedStaff.baseSalary) * 100)}%
+                    {disbursementPercent}%
                   </span>
                 </div>
                 <div className="h-2.5 bg-stone-200 rounded-full overflow-hidden">
                   <div 
                     className="h-full rounded-full transition-all duration-500"
                     style={{ 
-                      width: `${Math.min(100, (totalDisbursed / selectedStaff.baseSalary) * 100)}%`,
+                      width: `${disbursementPercent}%`,
                       backgroundColor: isFullyDisbursed ? '#059669' : totalDisbursed > 0 ? '#f59e0b' : '#dc2626'
                     }}
                   />
@@ -1304,11 +1357,11 @@ function SalariesModuleContent({
               <div className="px-5 py-4 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-100">
-                    <span className="text-[9px] text-emerald-600 font-bold block uppercase">Already Disbursed (প্রদানকৃত)</span>
+                    <span className="text-[9px] text-emerald-600 font-bold block uppercase">Disbursed to Date (এ পর্যন্ত প্রদান)</span>
                     <span className="text-base font-black text-emerald-700 font-mono">৳{totalDisbursed.toLocaleString()}</span>
                   </div>
                   <div className={`rounded-lg p-3 border ${isFullyDisbursed ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
-                    <span className={`text-[9px] font-bold block uppercase ${isFullyDisbursed ? 'text-emerald-600' : 'text-red-500'}`}>Still Due (বাকি)</span>
+                    <span className={`text-[9px] font-bold block uppercase ${isFullyDisbursed ? 'text-emerald-600' : 'text-red-500'}`}>Still Due Through {disburseData.month} {disburseData.year} (বকেয়া)</span>
                     <span className={`text-base font-black font-mono ${isFullyDisbursed ? 'text-emerald-700' : 'text-red-600'}`}>৳{remaining.toLocaleString()}</span>
                   </div>
                 </div>
@@ -1350,7 +1403,7 @@ function SalariesModuleContent({
                   <div className="py-5 text-center border-t border-stone-100">
                     <BadgeCheck className="h-10 w-10 text-emerald-400 mx-auto mb-2" />
                     <p className="text-sm font-bold text-emerald-700">Fully Disbursed (সম্পূর্ণ প্রদানকৃত)</p>
-                    <p className="text-[10px] text-emerald-500 mt-0.5">No further disbursement needed for this month.</p>
+                    <p className="text-[10px] text-emerald-500 mt-0.5">No outstanding salary through the selected month.</p>
                   </div>
                 )}
               </div>
@@ -1736,13 +1789,15 @@ function SalariesModuleContent({
 
     {profileTeacher && !readOnly && (
       <div className="fixed inset-0 z-50 bg-black/45 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-xl border border-stone-200 w-full max-w-lg p-5 space-y-4">
+        <div className="bg-white rounded-xl shadow-xl border border-stone-200 w-full max-w-lg max-h-[90vh] overflow-y-auto p-5 space-y-4">
           <div className="flex items-center justify-between"><h3 className="text-sm font-bold">Edit Teacher Profile</h3><button onClick={() => setProfileTeacher(null)} className="text-stone-500" title="Close"><X className="h-4 w-4" /></button></div>
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="text-xs font-bold">Full Name<input value={profileDraft.fullName} onChange={(e) => setProfileDraft({ ...profileDraft, fullName: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /></label>
             <label className="text-xs font-bold">Designation<input value={profileDraft.designation} onChange={(e) => setProfileDraft({ ...profileDraft, designation: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /></label>
             <label className="text-xs font-bold">Phone Number<input type="tel" value={profileDraft.contact} onChange={(e) => setProfileDraft({ ...profileDraft, contact: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /></label>
             <label className="text-xs font-bold">Email<input type="email" value={profileDraft.email} onChange={(e) => setProfileDraft({ ...profileDraft, email: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /></label>
+            <label className="text-xs font-bold">Running Salary (মাসিক বেতন)<input type="text" inputMode="decimal" value={profileDraft.baseSalary} onChange={(e) => setProfileDraft({ ...profileDraft, baseSalary: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /></label>
+            <label className="text-xs font-bold">Due Salary (বর্তমান বকেয়া)<input type="text" inputMode="decimal" value={profileDraft.salaryDue} onChange={(e) => setProfileDraft({ ...profileDraft, salaryDue: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /><span className="block text-[10px] font-normal text-stone-500 mt-1">Set the teacher's current total unpaid balance. The running salary continues accruing each month.</span></label>
             <label className="text-xs font-bold sm:col-span-2">Profile Image Link<input type="url" value={profileDraft.photoUrl} onChange={(e) => setProfileDraft({ ...profileDraft, photoUrl: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal" /></label>
             <label className="text-xs font-bold sm:col-span-2">Bio<textarea value={profileDraft.bio} onChange={(e) => setProfileDraft({ ...profileDraft, bio: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 font-normal h-20" /></label>
           </div>

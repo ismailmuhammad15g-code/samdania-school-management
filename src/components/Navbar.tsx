@@ -21,9 +21,10 @@ import {
   ClipboardList,
   Eye,
   Bot,
-  Globe2
-  ,Megaphone
-  ,FileWarning
+  Globe2,
+  Megaphone,
+  FileWarning,
+  ArrowRightLeft
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 
@@ -39,15 +40,23 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'finance', label: 'Finance', icon: DollarSign },
   { id: 'fees', label: 'Students', icon: Users },
+  { id: 'promotion', label: 'Student Promotion', icon: ArrowRightLeft },
   { id: 'salaries', label: 'Teachers (শিক্ষক)', icon: Wallet },
   { id: 'staffManagement', label: 'Staff (স্টাফ)', icon: Users },
   { id: 'results', label: 'Results', icon: GraduationCap },
   { id: 'loans', label: 'Loans', icon: PiggyBank },
-  { id: 'settings', label: 'Settings', icon: Settings },
-  { id: 'assistant', label: 'Assistant', icon: Bot },
-  { id: 'appManagement', label: 'App Management', icon: Megaphone },
-  { id: 'mainMadrasah', label: 'Main Madrasah', icon: Globe2 },
-  { id: 'missingFillouts', label: 'Missing Fillouts', icon: FileWarning },
+];
+
+const MORE_ITEMS = [
+  { id: 'settings', label: 'Settings', description: 'System setup and preferences', icon: Settings },
+  { id: 'assistant', label: 'Assistant', description: 'Madrasah management assistant', icon: Bot },
+  { id: 'appManagement', label: 'App Management', description: 'Notices and app administration', icon: Megaphone },
+  { id: 'mainMadrasah', label: 'Main Madrasah', description: 'Official website management', icon: Globe2 },
+  { id: 'missingFillouts', label: 'Missing Fillouts', description: 'Incomplete student information', icon: FileWarning },
+  { id: 'summary', label: 'Student Summary', description: 'Profile & Results (সারসংক্ষেপ)', icon: ClipboardList },
+  { id: 'pending', label: 'Pending (অপেক্ষমাণ)', description: 'Teacher resignations & requests', icon: ClipboardList },
+  { id: 'closing', label: 'Closing', description: 'Monthly & Yearly ختام', icon: FileStack },
+  { id: 'hifz', label: 'Hifz', description: 'Hifz student management', icon: BookOpenCheck },
 ];
 
 export default function Navbar({
@@ -120,12 +129,12 @@ export default function Navbar({
               );
             })}
 
-            {/* More dropdown (Closing / Hifz) */}
+            {/* Less-used sections are grouped here to keep the main navigation compact. */}
             <div className="relative">
               <button
                 onClick={() => setMoreOpen(!moreOpen)}
                 className={`relative px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 cursor-pointer ${
-                  activeTab === 'closing' || activeTab === 'hifz' || activeTab === 'summary' || activeTab === 'pending'
+                  MORE_ITEMS.some((item) => item.id === activeTab)
                     ? 'bg-white/15 text-white shadow-sm'
                     : 'text-white/50 hover:text-white/80 hover:bg-white/5'
                 }`}
@@ -133,7 +142,7 @@ export default function Navbar({
                 <ChevronsDown className="h-3.5 w-3.5" />
                 More
                 <ChevronDown className={`h-3 w-3 transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
-                {(activeTab === 'closing' || activeTab === 'hifz' || activeTab === 'summary') && (
+                {MORE_ITEMS.some((item) => item.id === activeTab) && (
                   <span className="absolute bottom-0 left-2 right-2 h-0.5 bg-[#d9c5b2] rounded-full" />
                 )}
               </button>
@@ -141,47 +150,25 @@ export default function Navbar({
               {moreOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setMoreOpen(false)} />
-                  <div className="absolute left-0 top-full mt-1 w-56 bg-[#1e2a20] border border-white/10 rounded-xl shadow-2xl z-50 py-1.5 overflow-hidden">
-                  <button
-                    onClick={() => { handleNav('summary'); setMoreOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-xs text-white/80 hover:bg-white/10 flex items-center gap-2.5 transition-colors cursor-pointer"
-                  >
-                    <ClipboardList className="h-4 w-4 text-[#d9c5b2]" />
-                    <span>
-                      <span className="block font-semibold">Student Summary</span>
-                      <span className="block text-[10px] text-white/40">Profile &amp; Results (সারসংক্ষেপ)</span>
-                    </span>
-                  </button>
-                  <button
-                    onClick={() => { handleNav('pending'); setMoreOpen(false); }}
-                    className="w-full px-3 py-2.5 text-left text-xs text-white/80 hover:bg-white/10 flex items-center gap-2.5 transition-colors cursor-pointer"
-                  >
-                    <ClipboardList className="h-4 w-4 text-[#d9c5b2]" />
-                    <span>
-                      <span className="block font-semibold">Pending (অপেক্ষমাণ)</span>
-                      <span className="block text-[10px] text-white/40">Teacher resignations &amp; requests</span>
-                    </span>
-                  </button>
-                    <button
-                      onClick={() => { handleNav('closing'); setMoreOpen(false); }}
-                      className="w-full px-3 py-2.5 text-left text-xs text-white/80 hover:bg-white/10 flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <FileStack className="h-4 w-4 text-[#d9c5b2]" />
-                      <span>
-                        <span className="block font-semibold">Closing</span>
-                        <span className="block text-[10px] text-white/40">Monthly &amp; Yearly ختام</span>
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => { handleNav('hifz'); setMoreOpen(false); }}
-                      className="w-full px-3 py-2.5 text-left text-xs text-white/80 hover:bg-white/10 flex items-center gap-2.5 transition-colors cursor-pointer"
-                    >
-                      <BookOpenCheck className="h-4 w-4 text-[#d9c5b2]" />
-                      <span>
-                        <span className="block font-semibold">Hifz</span>
-                        <span className="block text-[10px] text-white/40">حفظ progress</span>
-                      </span>
-                    </button>
+                  <div className="absolute right-0 top-full mt-1 w-64 bg-[#1e2a20] border border-white/10 rounded-xl shadow-2xl z-50 py-1.5 overflow-hidden">
+                    {MORE_ITEMS.map((item) => {
+                      const Icon = item.icon;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => { handleNav(item.id as AppTab); setMoreOpen(false); }}
+                          className={`w-full px-3 py-2.5 text-left text-xs hover:bg-white/10 flex items-center gap-2.5 transition-colors cursor-pointer ${
+                            activeTab === item.id ? 'text-white bg-white/5' : 'text-white/80'
+                          }`}
+                        >
+                          <Icon className="h-4 w-4 shrink-0 text-[#d9c5b2]" />
+                          <span>
+                            <span className="block font-semibold">{item.label}</span>
+                            <span className="block text-[10px] text-white/40">{item.description}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </>
               )}
@@ -272,55 +259,45 @@ export default function Navbar({
               );
             })}
 
-            {/* More items (Summary / Closing / Hifz) for mobile */}
-            <a
-              href={tabToPath('summary')}
-              onClick={handleAnchor('summary')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer no-underline ${
-                activeTab === 'summary'
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/50 hover:bg-white/5 hover:text-white/80'
-              }`}
-            >
-              <ClipboardList className="h-4 w-4" />
-              Student Summary
-            </a>
-            <a
-              href={tabToPath('pending')}
-              onClick={handleAnchor('pending')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer no-underline ${
-                activeTab === 'pending'
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/50 hover:bg-white/5 hover:text-white/80'
-              }`}
-            >
-              <ClipboardList className="h-4 w-4" />
-              Pending (অপেক্ষমাণ)
-            </a>
-            <a
-              href={tabToPath('closing')}
-              onClick={handleAnchor('closing')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer no-underline ${
-                activeTab === 'closing'
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/50 hover:bg-white/5 hover:text-white/80'
-              }`}
-            >
-              <FileStack className="h-4 w-4" />
-              Closing
-            </a>
-            <a
-              href={tabToPath('hifz')}
-              onClick={handleAnchor('hifz')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer no-underline ${
-                activeTab === 'hifz'
-                  ? 'bg-white/15 text-white'
-                  : 'text-white/50 hover:bg-white/5 hover:text-white/80'
-              }`}
-            >
-              <BookOpenCheck className="h-4 w-4" />
-              Hifz
-            </a>
+            <div>
+              <button
+                type="button"
+                onClick={() => setMoreOpen(!moreOpen)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  MORE_ITEMS.some((item) => item.id === activeTab)
+                    ? 'bg-white/15 text-white'
+                    : 'text-white/60 hover:bg-white/5 hover:text-white/80'
+                }`}
+              >
+                <span className="flex items-center gap-3">
+                  <ChevronsDown className="h-4 w-4" />
+                  More sections
+                </span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {moreOpen && (
+                <div className="mt-1 ml-3 border-l border-white/10 pl-2">
+                  {MORE_ITEMS.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <a
+                        key={item.id}
+                        href={tabToPath(item.id as AppTab)}
+                        onClick={handleAnchor(item.id as AppTab)}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all cursor-pointer no-underline ${
+                          activeTab === item.id
+                            ? 'bg-white/15 text-white'
+                            : 'text-white/50 hover:bg-white/5 hover:text-white/80'
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {item.label}
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </nav>
         </div>
       )}

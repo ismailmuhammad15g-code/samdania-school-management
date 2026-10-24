@@ -38,6 +38,18 @@ export function todayISO(): string {
   return toISODate(new Date());
 }
 
+export function formatAttendanceTime(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+export function classifyArrival(date: Date, expectedArrivalTime: string): 'early' | 'on-time' | 'late' {
+  const [hour, minute] = expectedArrivalTime.split(':').map(Number);
+  const expectedMinutes = hour * 60 + minute;
+  const arrivalMinutes = date.getHours() * 60 + date.getMinutes();
+  return arrivalMinutes < expectedMinutes ? 'early' : arrivalMinutes > expectedMinutes ? 'late' : 'on-time';
+}
+
 // Build the signed, tamper-proof token for a given day in a set.
 function signToken(setId: string, date: string, secret: string): string {
   const payload = `${MAGIC}|${setId}|${date}`;
@@ -121,7 +133,7 @@ export function playBeep(): void {
 }
 
 export type AttendanceScanResult =
-  | { status: 'arrived'; time: string }            // first scan → arrived
+  | { status: 'arrived'; time: string; arrivalStatus: 'early' | 'on-time' | 'late' } // first scan → arrived
   | { status: 'departed'; time: string }           // second scan → left
   | { status: 'already'; entryTime: string; exitTime: string | null } // already recorded
   | { status: 'wrongday'; qrDate: string }         // QR not for today

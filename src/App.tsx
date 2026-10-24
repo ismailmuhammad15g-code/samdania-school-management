@@ -6,6 +6,7 @@ import {
   FeePayment, 
   TeacherStaff,
   SalaryPayment,
+  MONTHS,
   StudentResult,
   LoanRecord,
   LoanPayment,
@@ -15,6 +16,7 @@ import {
   TeacherLeave,
   AttendanceQRSet,
   AttendanceRecord,
+  AttendancePolicy,
   TeacherPortalSession,
   StaffAccount,
   StaffPortalSession,
@@ -22,12 +24,13 @@ import {
   StudentAttendanceStatus,
   TeacherResignationRequest
 } from './types';
-import { initDatabase, dbGet, dbSet, dbDelete, dbRefreshKey, onDbChange } from './lib/localDb';
+import { initDatabase, dbGet, dbSet, dbDelete, dbRefreshKey, dbExportAll, onDbChange } from './lib/localDb';
 import { pushNotification } from './lib/notifications';
 import { getSession, logoutAdmin, setAdminReadOnlyFlag, getAdminReadOnlyFlag, ensureAdminCredentials } from './lib/auth';
-import { verifyScanned, generateQRSet, todayISO, type AttendanceScanResult } from './lib/attendance';
+import { verifyScanned, generateQRSet, todayISO, classifyArrival, formatAttendanceTime, type AttendanceScanResult } from './lib/attendance';
 import { clearTeacherPortalSession, createTeacherPortalSession, persistTeacherPortalSession, validateTeacherPortalSession, loadTeacherPortalSession } from './lib/teacherSessions';
 import { clearStaffPortalSession, createStaffPortalSession, persistStaffPortalSession, validateStaffPortalSession, loadStaffPortalSession } from './lib/staffSessions';
+import { getSalaryBalance } from './lib/salary';
 
 import LoginPage from './components/LoginPage';
 import AdminRoleSelect from './components/AdminRoleSelect';
@@ -59,8 +62,10 @@ import AssistantModule from './components/AssistantModule';
 import MainMadrasahPage from './components/MainMadrasahPage';
 import AppManagementPage from './components/AppManagementPage';
 import MissingFilloutsPage from './components/MissingFilloutsPage';
+import StudentPromotionModule from './components/StudentPromotionModule';
 import { tabToPath, pathToTab, type AppTab } from './lib/routes';
 import type { AgentActions } from './lib/aiTools';
+import { isStudentActive } from './lib/studentEnrollment';
 
 function accountIsNonTeachingStaff(account: TeacherAccount): boolean {
   const roleDescription = `${account.role || ''} ${account.designation || ''}`.toLowerCase();
@@ -212,6 +217,7 @@ export default function App() {
   // ── TEACHER ATTENDANCE (উপস্থিতি): 12-day QR set + per-day records ──
   const [attendanceQRSet, setAttendanceQRSet] = useState<AttendanceQRSet | null>(null);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
+  const [attendancePolicy, setAttendancePolicy] = useState<AttendancePolicy>({ expectedArrivalTime: '09:00' });
   const [studentAttendanceRecords, setStudentAttendanceRecords] = useState<StudentAttendanceRecord[]>([]);
   // Per-teacher salary-reveal preference (persisted so it survives refresh)
   const [salaryVisibleTeachers, setSalaryVisibleTeachers] = useState<string[]>([]);
@@ -311,6 +317,13 @@ export default function App() {
     setSalaryVisibleTeachers(load('samdani_salary_visible', []));
     setAttendanceQRSet(load<AttendanceQRSet | null>('samdani_attendance_qrset', null));
     setAttendanceRecords(load('samdani_attendance_records', []));
+    setAttendancePolicy(load<AttendancePolicy>(
+      'samdani_attendance_policy',
+      { expectedArrivalTime: '09:00' },
+      (value) => typeof value?.expectedArrivalTime === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value.expectedArrivalTime)
+        ? value
+        : { expectedArrivalTime: '09:00' },
+    ));
     setStudentAttendanceRecords(load('samdani_student_attendance_records', [], (v: any[]) =>
       v.map((rec: any) => ({
         ...rec,
@@ -406,6 +419,7 @@ export default function App() {
   useEffect(() => { if (canPersist) dbSet('samdani_salary_visible', salaryVisibleTeachers); }, [salaryVisibleTeachers, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_attendance_qrset', attendanceQRSet); }, [attendanceQRSet, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_attendance_records', attendanceRecords); }, [attendanceRecords, canPersist]);
+  useEffect(() => { if (canPersist) dbSet('samdani_attendance_policy', attendancePolicy); }, [attendancePolicy, canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_student_attendance_records', studentAttendanceRecords); }, [studentAttendanceRecords, canPersist]);
 
   useEffect(() => {
@@ -614,6 +628,18 @@ export default function App() {
   const handleDeleteStudent = async (id: string) => {
     const updatedStudents = students.filter((s) => s.id !== id);
     setStudents(updatedStudents);
+  };
+
+  const handleStudentPromotion = (updatedStudents: Student[]) => {
+    const changedCount = updatedStudents.filter((student) =>
+      students.find((current) => current.id === student.id)?.academicSession !== student.academicSession
+    ).length;
+    setStudents(updatedStudents);
+    pushNotification({
+      type: 'student',
+      title: 'Student session transition completed',
+      message: `${changedCount} student record(s) updated for the next academic session`,
+    });
   };
 
   // Jump from Student Summary → Fees and open the Collect Fee form for a student
@@ -1032,18 +1058,42 @@ export default function App() {
     setTeacherAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   };
 
-  const handleUpdateTeacherProfile = (accountId: string, patch: { fullName: string; designation: string; contact: string; email: string; bio: string; photoUrl?: string }) => {
+  const handleUpdateTeacherProfile = (accountId: string, patch: { fullName: string; designation: string; contact: string; email: string; bio: string; photoUrl?: string; baseSalary: number; salaryDue: number }) => {
     const account = teacherAccounts.find((item) => item.id === accountId);
-    setTeacherAccounts((prev) => prev.map((item) => item.id === accountId ? { ...item, ...patch } : item));
+    setTeacherAccounts((prev) => prev.map((item) => item.id === accountId ? {
+      ...item,
+      fullName: patch.fullName,
+      designation: patch.designation,
+      contact: patch.contact,
+      email: patch.email,
+      bio: patch.bio,
+      photoUrl: patch.photoUrl,
+    } : item));
     if (account) {
-      setTeachersStaff((prev) => prev.map((staff) => staff.email === account.email ? {
-        ...staff,
-        name: patch.fullName,
-        designation: patch.designation,
-        contact: patch.contact,
-        email: patch.email,
-        bio: patch.bio,
-      } : staff));
+      setTeachersStaff((prev) => prev.map((staff) => {
+        if (staff.email.toLowerCase() !== account.email.toLowerCase() && staff.name.toLowerCase() !== account.fullName.toLowerCase()) {
+          return staff;
+        }
+        const updatedSalary = { ...staff, baseSalary: patch.baseSalary, salaryDueAdjustment: 0 };
+        const now = new Date();
+        const currentBalance = getSalaryBalance(
+          updatedSalary,
+          salaryPayments,
+          MONTHS[now.getMonth()],
+          now.getFullYear(),
+          account.createdAt,
+        );
+        return {
+          ...staff,
+          name: patch.fullName,
+          designation: patch.designation,
+          contact: patch.contact,
+          email: patch.email,
+          bio: patch.bio,
+          baseSalary: patch.baseSalary,
+          salaryDueAdjustment: patch.salaryDue - currentBalance.balanceBeforeClamp,
+        };
+      }));
     }
   };
 
@@ -1151,27 +1201,29 @@ export default function App() {
 
     const id = `${teacherId}_${today}`;
     const existing = attendanceRecords.find((r) => r.id === id);
-    const now = new Date().toISOString();
+    const nowDate = new Date();
+    const now = nowDate.toISOString();
+    const arrivalStatus = classifyArrival(nowDate, attendancePolicy.expectedArrivalTime);
 
     if (!existing) {
-      const rec: AttendanceRecord = { id, teacherId, teacherName, date: today, entryTime: now, exitTime: null };
+      const rec: AttendanceRecord = { id, teacherId, teacherName, date: today, entryTime: now, exitTime: null, arrivalStatus };
       setAttendanceRecords((prev) => [rec, ...prev]);
       pushNotification({
         type: 'attendance',
         title: 'Teacher arrived',
-        message: `${teacherName} marked attendance at ${new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        message: `${teacherName} marked attendance ${arrivalStatus === 'late' ? 'late' : arrivalStatus === 'early' ? 'early' : 'on time'} at ${formatAttendanceTime(nowDate)}`,
       });
-      return { status: 'arrived', time: now };
+      return { status: 'arrived', time: now, arrivalStatus };
     }
     if (!existing.entryTime) {
-      const updated = { ...existing, entryTime: now };
+      const updated = { ...existing, entryTime: now, arrivalStatus };
       setAttendanceRecords((prev) => prev.map((r) => (r.id === id ? updated : r)));
       pushNotification({
         type: 'attendance',
         title: 'Teacher arrived',
-        message: `${teacherName} marked attendance at ${new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        message: `${teacherName} marked attendance ${arrivalStatus === 'late' ? 'late' : arrivalStatus === 'early' ? 'early' : 'on time'} at ${formatAttendanceTime(nowDate)}`,
       });
-      return { status: 'arrived', time: now };
+      return { status: 'arrived', time: now, arrivalStatus };
     }
     if (!existing.exitTime) {
       const updated = { ...existing, exitTime: now };
@@ -1179,7 +1231,7 @@ export default function App() {
       pushNotification({
         type: 'attendance',
         title: 'Teacher departed',
-        message: `${teacherName} left at ${new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
+        message: `${teacherName} left at ${formatAttendanceTime(nowDate)}`,
       });
       return { status: 'departed', time: now };
     }
@@ -1232,7 +1284,13 @@ export default function App() {
     if (result.status === 'invalid') {
       window.dispatchEvent(new CustomEvent('attendance-route-result', { detail: { status: 'invalid' } }));
     } else if (result.status === 'arrived' || result.status === 'departed') {
-      window.dispatchEvent(new CustomEvent('attendance-route-result', { detail: { status: result.status, time: result.time } }));
+      window.dispatchEvent(new CustomEvent('attendance-route-result', {
+        detail: {
+          status: result.status,
+          time: result.time,
+          arrivalStatus: result.status === 'arrived' ? result.arrivalStatus : undefined,
+        },
+      }));
     } else {
       window.dispatchEvent(new CustomEvent('attendance-route-result', { detail: { status: result.status } }));
     }
@@ -1525,6 +1583,7 @@ export default function App() {
           session={teacherSession}
           account={currentAccount}
           staffRecord={currentStaff}
+          attendanceRecords={attendanceRecords.filter((record) => record.teacherId === teacherSession.accountId)}
           onBack={() => setTeacherView('dashboard')}
           onLogout={handleTeacherLogout}
           onRequestResign={handleSubmitResignation}
@@ -1540,7 +1599,7 @@ export default function App() {
           allTeachers={teacherAccounts
             .filter((a) => a.registered && !accountIsNonTeachingStaff(a))
             .map((a) => ({ id: a.id, fullName: a.fullName, designation: a.designation, photoUrl: a.photoUrl, role: a.role, email: a.email }))}
-          students={students}
+          students={students.filter(isStudentActive)}
           academicClasses={academicClasses}
           studentAttendanceRecords={studentAttendanceRecords}
           onSubmitStudentAttendance={handleSubmitStudentAttendance}
@@ -1554,6 +1613,7 @@ export default function App() {
           todayRecord={attendanceRecords.find(
             (r) => teacherSession && r.teacherId === teacherSession.accountId && r.date === todayISO()
           ) || null}
+          attendanceRecords={attendanceRecords.filter((record) => record.teacherId === teacherSession.accountId)}
           onScan={(raw: string) => handleAttendanceScan(teacherSession.accountId, teacherSession.fullName, raw)}
         />
       );
@@ -1664,7 +1724,7 @@ export default function App() {
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
         {activeTab === 'dashboard' && (
           <Dashboard
-            students={students}
+            students={students.filter(isStudentActive)}
             ledger={ledger}
             payments={payments}
             onNavigate={(tab) => navigate(tab as AppTab)}
@@ -1695,7 +1755,7 @@ export default function App() {
 
         {activeTab === 'fees' && (
           <FeesModule
-            students={students}
+            students={students.filter(isStudentActive)}
             payments={payments}
             academicClasses={academicClasses}
             admins={admins}
@@ -1715,12 +1775,22 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'promotion' && (
+          <StudentPromotionModule
+            students={students}
+            academicClasses={academicClasses}
+            backupData={dbExportAll()}
+            onPromote={handleStudentPromotion}
+            readOnly={adminReadOnly}
+          />
+        )}
+
         {activeTab === 'appManagement' && (
           <AppManagementPage
             readOnly={adminReadOnly}
             teacherAccounts={teacherAccounts}
             staffAccounts={staffAccounts}
-            students={students}
+            students={students.filter(isStudentActive)}
             adminName={adminName}
           />
         )}
@@ -1731,7 +1801,7 @@ export default function App() {
 
         {activeTab === 'missingFillouts' && (
           <MissingFilloutsPage
-            students={students}
+            students={students.filter(isStudentActive)}
             academicClasses={academicClasses}
             onSaveStudent={handleEditStudent}
             onOpenEditStudent={(student) => { setPendingEditStudentId(student.id); navigate('fees'); }}
@@ -1834,6 +1904,8 @@ export default function App() {
               onUpdateAdmins={setAdmins}
               attendanceQRSet={attendanceQRSet}
               attendanceRecords={attendanceRecords}
+              attendancePolicy={attendancePolicy}
+              onUpdateAttendancePolicy={setAttendancePolicy}
               onGenerateAttendanceQRSet={handleGenerateAttendanceQRSet}
               onDeleteAttendanceQRSet={handleDeleteAttendanceQRSet}
               onClearFeePayments={handleClearFeePayments}
@@ -1852,6 +1924,8 @@ export default function App() {
                 onUpdateAdmins={setAdmins}
                 attendanceQRSet={attendanceQRSet}
                 attendanceRecords={attendanceRecords}
+                attendancePolicy={attendancePolicy}
+                onUpdateAttendancePolicy={setAttendancePolicy}
                 onGenerateAttendanceQRSet={handleGenerateAttendanceQRSet}
                 onDeleteAttendanceQRSet={handleDeleteAttendanceQRSet}
                 onClearFeePayments={handleClearFeePayments}
@@ -1900,7 +1974,7 @@ export default function App() {
 
         {activeTab === 'summary' && (
           <StudentSummaryModule
-            students={students}
+            students={students.filter(isStudentActive)}
             results={studentResults}
             onEditStudent={handleEditStudentFromSummary}
             onPayFees={handlePayStudentFees}

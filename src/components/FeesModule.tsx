@@ -39,7 +39,7 @@ const feeNum = (v: unknown): number => {
   const n = parseNumberWithBengaliSupport(v);
   return Number.isFinite(n) ? n : 0;
 };
-const SMS_API_URL = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3015';
+const SMS_API_URL = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3018';
 
 interface FeesModuleProps {
   students: Student[];

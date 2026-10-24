@@ -76,33 +76,37 @@ export default function QrGenerateSection({ qrSet, attendance, onGenerate, onDel
   };
 
   const handlePrint = () => {
+    const pages = Array.from({ length: Math.ceil(images.length / 6) }, (_, index) => images.slice(index * 6, index * 6 + 6));
     const html = `
       <html><head><title>Attendance QR Codes</title>
       <style>
-        body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:20px;color:#2c332d;}
-        h1{font-size:18px;text-align:center;margin:0 0 4px;}
-        .sub{text-align:center;font-size:11px;color:#666;margin-bottom:16px;}
-        .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
-        .cell{border:2px solid #2c332d;border-radius:10px;padding:10px;text-align:center;page-break-inside:avoid;}
-        .cell img{width:130px;height:130px;}
-        .day{font-weight:bold;font-size:13px;margin-top:6px;}
-        .date{font-size:11px;color:#555;}
-        .foot{margin-top:18px;text-align:center;font-size:10px;color:#888;}
+        @page{size:A4 portrait;margin:10mm;}
+        *{box-sizing:border-box;}
+        body{font-family:Arial,Helvetica,sans-serif;margin:0;color:#2c332d;}
+        .page{height:277mm;display:flex;flex-direction:column;page-break-after:always;break-after:page;}
+        .page:last-child{page-break-after:auto;break-after:auto;}
+        h1{font-size:17px;text-align:center;margin:0 0 3px;}
+        .sub{text-align:center;font-size:10px;color:#666;margin-bottom:10px;}
+        .grid{flex:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:8mm;}
+        .cell{min-height:0;border:1.5px solid #2c332d;border-radius:8px;padding:5mm;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;break-inside:avoid;}
+        .cell img,.placeholder{width:46mm;height:46mm;object-fit:contain;}
+        .day{font-weight:bold;font-size:13px;margin-top:5px;}
+        .date{font-size:11px;color:#555;margin-top:2px;}
+        .foot{margin-top:7mm;text-align:center;font-size:9px;color:#666;}
+        @media screen{body{padding:12mm}.page{margin:0 auto 12mm;max-width:190mm;border:1px solid #ddd;padding:0}}
       </style></head><body>
-      <h1>Samdania Talimul Islam Madrasah</h1>
-      <div class="sub">Teacher Attendance QR Codes · ${qrSet?.startDate} – ${lastDay}</div>
-      <div class="grid">
-        ${images
-          .map(
-            (im) => `<div class="cell">
-              ${im.dataUrl ? `<img src="${im.dataUrl}"/>` : '<div style="width:130px;height:130px;background:#eee"></div>'}
-              <div class="day">Day ${im.index}</div>
-              <div class="date">${im.date}</div>
-            </div>`
-          )
-          .join('')}
-      </div>
-      <div class="foot">Scan with the teacher portal → Attendance (الحضور). First scan = Arrival, second = Departure.</div>
+      ${pages.map((pageImages) => `<section class="page">
+        <h1>Samdania Talimul Islam Madrasah</h1>
+        <div class="sub">Teacher Attendance QR Codes · ${qrSet?.startDate} – ${lastDay} · 6 codes per page</div>
+        <div class="grid">
+          ${pageImages.map((im) => `<div class="cell">
+            ${im.dataUrl ? `<img src="${im.dataUrl}" alt="Day ${im.index}"/>` : '<div class="placeholder" style="background:#eee"></div>'}
+            <div class="day">Day ${im.index}</div>
+            <div class="date">${im.date}</div>
+          </div>`).join('')}
+        </div>
+        <div class="foot">Scan with the teacher portal → Attendance (الحضور). First scan = Arrival, second = Departure.</div>
+      </section>`).join('')}
       </body></html>`;
     const w = window.open('', '_blank', 'width=800,height=900');
     if (!w) {
@@ -127,7 +131,7 @@ export default function QrGenerateSection({ qrSet, attendance, onGenerate, onDel
           Generate a set of 12 unique, signed QR codes — one for each day. Teachers scan today's code from their
           portal: the <span className="font-bold text-[#4a5d4e]">first scan marks arrival</span> and the
           <span className="font-bold text-[#4a5d4e]"> second marks departure</span>. Each code is tamper-proof and
-          only works on its assigned date.
+          only works on its assigned date. Printed sheets use six larger codes per page.
         </p>
 
         {needsRegenerate && (
@@ -179,7 +183,7 @@ export default function QrGenerateSection({ qrSet, attendance, onGenerate, onDel
                   className="bg-white border border-stone-300 hover:bg-stone-50 text-stone-700 text-[11px] font-bold px-3 py-1.5 rounded-lg cursor-pointer flex items-center gap-1.5"
                 >
                   <Printer className="h-3.5 w-3.5" />
-                  Print All
+                  Print All (6/page)
                 </button>
                 <button
                   onClick={() => {

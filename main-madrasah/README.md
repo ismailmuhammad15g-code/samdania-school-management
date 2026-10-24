@@ -8,7 +8,7 @@ This folder contains the Next.js public website and its API. It shares the exist
 2. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to those same values. These are public project credentials, not admin secrets.
 3. Run the complete `supabase/schema.sql` in the selected Supabase project's SQL editor. It creates or upgrades the admissions, content, teacher, and storage structures, and applies the row-level security policies.
 
-The school software login uses `VITE_ADMIN_EMAIL`, `VITE_ADMIN_PASSWORD`, and `VITE_AUTH_SALT` from the root `.env`. After those credentials are accepted, the software silently attempts to sign into Supabase Auth with that same email and password. To enable website administration, create a Supabase Auth user once with those same credentials and grant it the admin app-metadata claim below. Staff still enter their credentials only once, at the normal software login. Do not expose admission data by weakening database policies. In local development, the website API URL defaults to `http://localhost:3012`; deployments with separately hosted apps should set `VITE_MAIN_MADRASAH_API_URL` to the HTTPS website origin.
+The school software login uses `VITE_ADMIN_EMAIL`, `VITE_ADMIN_PASSWORD`, and `VITE_AUTH_SALT` from the root `.env`. After those credentials are accepted, the software silently attempts to sign into Supabase Auth with that same email and password. To enable website administration, create a Supabase Auth user once with those same credentials and grant it the admin app-metadata claim below. Staff still enter their credentials only once, at the normal software login. Do not expose admission data by weakening database policies. In local development, the website API runs on port 3018; deployments with separately hosted apps should set `VITE_MAIN_MADRASAH_API_URL` to the HTTPS website origin.
 
 ## SMS setup
 
@@ -18,10 +18,10 @@ Restart the website server after changing these values. Only authorized website 
 
 ## Run locally
 
-From this folder, install dependencies with `npm install`, then start the website on port 3012:
+From this folder, install dependencies with `npm install`, then start the website on port 3018:
 
 ```sh
-npm run dev -- --port 3012
+npm run dev
 ```
 
 The school management app runs separately from the repository root. Supabase is used for website data and its protected admin API; the software's own admin login is controlled by its `.env` values.

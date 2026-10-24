@@ -45,7 +45,7 @@ const EMPTY_CONTENT: SiteContent = {
 };
 
 const STATUSES: AdmissionRequest['status'][] = ['new', 'reviewed', 'contacted', 'closed'];
-const API_DEFAULT = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3012';
+const API_DEFAULT = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3018';
 const SUPABASE_PROJECT_REF = import.meta.env.VITE_SUPABASE_URL?.match(/^https?:\/\/([^.]+)/i)?.[1] ?? 'unknown';
 
 interface MainMadrasahPageProps {

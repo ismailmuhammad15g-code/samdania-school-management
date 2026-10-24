@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Search, Users, CheckCircle2, LogOut, Clock, XCircle, CalendarCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { TeacherAvatar } from './TeacherPhoto';
 import { AttendanceRecord, AttendanceQRSet } from '../types';
-import { todayISO, startOfWeekISO } from '../lib/attendance';
+import { formatAttendanceTime, todayISO, startOfWeekISO } from '../lib/attendance';
 
 interface TeacherLite {
   id: string;
@@ -21,7 +21,7 @@ interface AttendanceReportTabProps {
 }
 
 function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return formatAttendanceTime(iso);
 }
 
 export default function AttendanceReportTab({ teachers, records, qrSet, peopleLabel = 'Teachers' }: AttendanceReportTabProps) {
@@ -59,6 +59,27 @@ export default function AttendanceReportTab({ teachers, records, qrSet, peopleLa
     }
     return { present, checkedOut, absent, total: teachers.length };
   }, [teachers, recordsByTeacher, today]);
+  const sevenDayTrend = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (6 - index));
+    const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const daysRecords = records.filter((record) => record.date === iso && record.entryTime);
+    return {
+      date: iso,
+      count: daysRecords.length,
+      early: daysRecords.filter((record) => record.arrivalStatus === 'early').length,
+      onTime: daysRecords.filter((record) => record.arrivalStatus === 'on-time').length,
+      late: daysRecords.filter((record) => record.arrivalStatus === 'late').length,
+      unknown: daysRecords.filter((record) => !record.arrivalStatus).length,
+    };
+  });
+  const trendMax = Math.max(1, ...sevenDayTrend.map((day) => day.count));
+  const classifiedRecords = records.filter((record) => record.arrivalStatus);
+  const punctualityCounts = {
+    early: classifiedRecords.filter((record) => record.arrivalStatus === 'early').length,
+    onTime: classifiedRecords.filter((record) => record.arrivalStatus === 'on-time').length,
+    late: classifiedRecords.filter((record) => record.arrivalStatus === 'late').length,
+  };
 
   return (
     <div className="space-y-4">
@@ -81,6 +102,56 @@ export default function AttendanceReportTab({ teachers, records, qrSet, peopleLa
           <span className={`text-lg font-black font-mono ${summary.absent > 0 ? 'text-red-600' : 'text-stone-600'}`}>{summary.absent}</span>
         </div>
       </div>
+
+      <section className="bg-white rounded-xl border border-stone-200 shadow-sm p-4 space-y-4">
+        <div>
+          <h3 className="text-xs font-bold text-[#2c332d]">Attendance Analytics (উপস্থিতির বিশ্লেষণ)</h3>
+          <p className="text-[10px] text-stone-500 mt-1">Arrival records for the last 7 days and recorded arrival punctuality.</p>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-5 items-center">
+          <div>
+            <p className="text-[10px] font-bold text-stone-500 mb-3">Daily arrivals</p>
+            <div className="h-32 flex items-end gap-2 border-b border-stone-200 px-1">
+              {sevenDayTrend.map((day) => (
+                <div key={day.date} className="flex-1 h-full flex flex-col justify-end items-center gap-1" title={`${day.date}: ${day.count} arrivals`}>
+                  <span className="text-[9px] font-bold text-stone-500">{day.count || ''}</span>
+                  <div className="w-full max-w-8 flex flex-col-reverse overflow-hidden rounded-t" style={{ height: `${Math.max(day.count ? 12 : 0, day.count / trendMax * 78)}%` }}>
+                    {day.unknown > 0 && <div className="bg-stone-400" style={{ height: `${day.unknown / day.count * 100}%` }} />}
+                    {day.late > 0 && <div className="bg-orange-500" style={{ height: `${day.late / day.count * 100}%` }} />}
+                    {day.onTime > 0 && <div className="bg-green-500" style={{ height: `${day.onTime / day.count * 100}%` }} />}
+                    {day.early > 0 && <div className="bg-teal-600" style={{ height: `${day.early / day.count * 100}%` }} />}
+                    {!day.count && <div className="h-full bg-stone-100" />}
+                  </div>
+                  <span className="text-[8px] text-stone-500">{day.date.slice(5)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-stone-500 mb-3">Arrival timing — all recorded</p>
+            {classifiedRecords.length ? (
+              <div className="flex items-center gap-4">
+                <div
+                  className="relative w-28 h-28 rounded-full shrink-0"
+                  style={{ background: `conic-gradient(#0d9488 0 ${punctualityCounts.early / classifiedRecords.length * 100}%, #22c55e ${punctualityCounts.early / classifiedRecords.length * 100}% ${(punctualityCounts.early + punctualityCounts.onTime) / classifiedRecords.length * 100}%, #f97316 ${(punctualityCounts.early + punctualityCounts.onTime) / classifiedRecords.length * 100}% 100%)` }}
+                  role="img"
+                  aria-label={`${punctualityCounts.early} early, ${punctualityCounts.onTime} on time, ${punctualityCounts.late} late`}
+                >
+                  <div className="absolute inset-4 rounded-full bg-white flex items-center justify-center text-lg font-black text-[#2c332d]">{classifiedRecords.length}</div>
+                </div>
+                <div className="space-y-1.5 text-[10px] text-stone-600">
+                  <p><span className="text-teal-700">Early:</span> {punctualityCounts.early}</p>
+                  <p><span className="text-green-700">On time:</span> {punctualityCounts.onTime}</p>
+                  <p><span className="text-orange-600">Late:</span> {punctualityCounts.late}</p>
+                </div>
+              </div>
+            ) : <p className="text-[10px] text-stone-500">Punctuality analysis will appear as teachers scan in under the arrival-time setting.</p>}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-3 text-[9px] text-stone-500">
+          <span className="text-teal-700">Teal: early</span><span className="text-green-700">Green: on time</span><span className="text-orange-600">Orange: late</span><span>Gray: legacy / unclassified</span>
+        </div>
+      </section>
 
       {/* Search */}
       <div className="relative w-full">
@@ -148,6 +219,7 @@ export default function AttendanceReportTab({ teachers, records, qrSet, peopleLa
                   <span className="flex items-center gap-1.5">
                     <Clock className="h-3.5 w-3.5 text-emerald-600" />
                     Arrival: <strong className="font-mono">{todayRec.entryTime ? fmtTime(todayRec.entryTime) : '—'}</strong>
+                    {todayRec.arrivalStatus && <strong className={`rounded px-1.5 py-0.5 text-[9px] ${todayRec.arrivalStatus === 'late' ? 'bg-orange-100 text-orange-700' : todayRec.arrivalStatus === 'early' ? 'bg-teal-100 text-teal-700' : 'bg-green-100 text-green-700'}`}>{todayRec.arrivalStatus}</strong>}
                   </span>
                   <span className="flex items-center gap-1.5">
                     <LogOut className="h-3.5 w-3.5 text-sky-600" />
@@ -173,14 +245,18 @@ export default function AttendanceReportTab({ teachers, records, qrSet, peopleLa
                           </span>
                           <span
                             className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                              r.exitTime
+                              r.arrivalStatus === 'late'
+                                ? 'bg-orange-100 text-orange-700'
+                                : r.arrivalStatus === 'early'
+                                ? 'bg-teal-100 text-teal-700'
+                                : r.exitTime
                                 ? 'bg-sky-100 text-sky-700'
                                 : r.entryTime
                                 ? 'bg-emerald-100 text-emerald-700'
                                 : 'bg-red-100 text-red-700'
                             }`}
                           >
-                            {r.exitTime ? 'Out' : r.entryTime ? 'In' : 'Absent'}
+                            {r.arrivalStatus || (r.exitTime ? 'Out' : r.entryTime ? 'In' : 'Absent')}
                           </span>
                         </div>
                       ))}

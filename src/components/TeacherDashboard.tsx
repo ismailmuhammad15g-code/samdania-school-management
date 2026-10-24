@@ -8,6 +8,8 @@ import AttendanceSection from './AttendanceSection';
 import NotificationBell from './NotificationBell';
 import TeacherNoticeboard from './TeacherNoticeboard';
 import { isClassMatch } from '../lib/digitUtils';
+import { getSalaryBalance } from '../lib/salary';
+import { formatAttendanceTime } from '../lib/attendance';
 
 interface TeacherDashboardProps {
   session: TeacherPortalSession;
@@ -25,6 +27,7 @@ interface TeacherDashboardProps {
   onDeleteAccount: (id: string) => void;
   qrSet: AttendanceQRSet | null;
   todayRecord: AttendanceRecord | null;
+  attendanceRecords: AttendanceRecord[];
   onScan: (raw: string) => AttendanceScanResult;
   students: Student[];
   academicClasses: string[];
@@ -32,7 +35,7 @@ interface TeacherDashboardProps {
   onSubmitStudentAttendance: (payload: { teacherId: string; teacherName: string; className: string; date: string; statuses: StudentAttendanceStatus[] }) => void;
 }
 
-export default function TeacherDashboard({ session, account, staffRecord, routines, leaves, salaryPayments, allTeachers, onRequestTeacherLeave, salaryVisible, onToggleSalaryVisible, onOpenSettings, onLogout, onDeleteAccount, qrSet, todayRecord, onScan, students, academicClasses, studentAttendanceRecords, onSubmitStudentAttendance }: TeacherDashboardProps) {
+export default function TeacherDashboard({ session, account, staffRecord, routines, leaves, salaryPayments, allTeachers, onRequestTeacherLeave, salaryVisible, onToggleSalaryVisible, onOpenSettings, onLogout, onDeleteAccount, qrSet, todayRecord, attendanceRecords, onScan, students, academicClasses, studentAttendanceRecords, onSubmitStudentAttendance }: TeacherDashboardProps) {
   const initial = (account?.fullName || session.fullName || 'T').trim().charAt(0).toUpperCase();
   const myRoutines = routines.filter((r) => r.teacherId === account?.id);
   const isVerifiedTeacher = Boolean(account?.registered && account?.status === 'verified');
@@ -93,27 +96,8 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
         .filter((p) => p.teacherStaffId === staffRecord.id && p.month === currentMonth && p.year === currentYear)
         .reduce((sum, p) => sum + p.netPaid, 0)
     : 0;
-  const joiningDate = staffRecord?.joinedAt || account?.createdAt;
-  const parsedJoiningDate = joiningDate ? new Date(joiningDate) : today;
-  const validJoiningDate = Number.isNaN(parsedJoiningDate.getTime()) ? today : parsedJoiningDate;
-  const startYear = validJoiningDate.getFullYear();
-  const startMonthIndex = validJoiningDate.getMonth();
-  const firstSalaryMonth = startYear * 12 + startMonthIndex;
-  const currentSalaryMonth = currentYear * 12 + currentMonthIndex;
-  const salaryMonthsElapsed = Math.max(1, currentSalaryMonth - firstSalaryMonth + 1);
-  const paidThroughCurrentMonth = staffRecord
-    ? salaryPayments
-        .filter((p) => {
-          if (p.teacherStaffId !== staffRecord.id) return false;
-          const paymentMonthIndex = MONTHS.indexOf(p.month);
-          if (paymentMonthIndex < 0) return false;
-          const paymentMonth = p.year * 12 + paymentMonthIndex;
-          return paymentMonth >= firstSalaryMonth && paymentMonth <= currentSalaryMonth;
-        })
-        .reduce((sum, p) => sum + p.netPaid, 0)
-    : 0;
   const remainingAllMonths = staffRecord
-    ? Math.max(0, staffRecord.baseSalary * salaryMonthsElapsed - paidThroughCurrentMonth)
+    ? getSalaryBalance(staffRecord, salaryPayments, currentMonth, currentYear, account?.createdAt).remaining
     : 0;
   const remainingThisMonth = staffRecord ? Math.max(0, staffRecord.baseSalary - receivedThisMonth) : 0;
   const isFullyPaidThisMonth = staffRecord ? remainingThisMonth <= 0 : false;
@@ -192,10 +176,11 @@ export default function TeacherDashboard({ session, account, staffRecord, routin
 
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent<{ status: string; time?: string }>).detail;
+      const detail = (e as CustomEvent<{ status: string; time?: string; arrivalStatus?: string }>).detail;
       if (!detail) return;
       if (detail.status === 'arrived') {
-        setRouteNotice('Attendance recorded successfully — you have arrived.');
+        const arrivalText = detail.arrivalStatus === 'late' ? 'You arrived late' : detail.arrivalStatus === 'early' ? 'You arrived early' : 'You arrived on time';
+        setRouteNotice(`${arrivalText}${detail.time ? ` at ${formatAttendanceTime(detail.time)}` : ''}.`);
       } else if (detail.status === 'departed') {
         setRouteNotice('Attendance recorded successfully — you have checked out.');
       } else if (detail.status === 'already') {

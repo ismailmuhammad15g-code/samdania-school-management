@@ -6,6 +6,7 @@ export type AppTab =
   | 'dashboard'
   | 'finance'
   | 'fees'
+  | 'promotion'
   | 'salaries'
   | 'staffManagement'
   | 'results'
@@ -24,6 +25,7 @@ export const TAB_PATHS: Record<AppTab, string> = {
   dashboard: '/home',
   finance: '/finance',
   fees: '/students',
+  promotion: '/student-promotion',
   salaries: '/teachers',
   staffManagement: '/staff-management',
   results: '/results',

@@ -1,23 +1,41 @@
 import React, { useState } from 'react';
 import logo2 from '../assets/images/logo2.png';
-import { LogOut, User, BadgeCheck, Mail, FileText, ArrowLeft, CheckCircle2, Settings, AlertTriangle, X } from 'lucide-react';
-import { TeacherAccount, TeacherPortalSession, TeacherStaff } from '../types';
+import { LogOut, User, BadgeCheck, Mail, FileText, ArrowLeft, CheckCircle2, Settings, AlertTriangle, X, ChartNoAxesCombined, Clock, CalendarCheck } from 'lucide-react';
+import { AttendanceRecord, TeacherAccount, TeacherPortalSession, TeacherStaff } from '../types';
+import { formatAttendanceTime, todayISO } from '../lib/attendance';
 
 interface TeacherSettingsProps {
   session: TeacherPortalSession;
   account?: TeacherAccount;
   staffRecord?: TeacherStaff;
+  attendanceRecords: AttendanceRecord[];
   onBack: () => void;
   onLogout: () => void;
   onRequestResign: (teacherId: string, reason?: string) => void;
 }
 
-export default function TeacherSettings({ session, account, staffRecord, onBack, onLogout, onRequestResign }: TeacherSettingsProps) {
+export default function TeacherSettings({ session, account, staffRecord, attendanceRecords, onBack, onLogout, onRequestResign }: TeacherSettingsProps) {
   const initial = (account?.fullName || session.fullName || 'T').trim().charAt(0).toUpperCase();
 
   const [showResign, setShowResign] = useState(false);
   const [resignReason, setResignReason] = useState('');
   const [resignSubmitted, setResignSubmitted] = useState(false);
+  const [attendanceAnalysisOpen, setAttendanceAnalysisOpen] = useState(false);
+  const personalRecords = [...attendanceRecords].sort((a, b) => b.date.localeCompare(a.date));
+  const todayRecord = personalRecords.find((record) => record.date === todayISO());
+  const last14Days = Array.from({ length: 14 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (13 - index));
+    const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    return { date: iso, record: personalRecords.find((record) => record.date === iso) };
+  });
+  const earlyCount = personalRecords.filter((record) => record.arrivalStatus === 'early').length;
+  const onTimeCount = personalRecords.filter((record) => record.arrivalStatus === 'on-time').length;
+  const lateCount = personalRecords.filter((record) => record.arrivalStatus === 'late').length;
+  const classifiedCount = earlyCount + onTimeCount + lateCount;
+  const donutBackground = classifiedCount
+    ? `conic-gradient(#0d9488 0 ${earlyCount / classifiedCount * 100}%, #22c55e ${earlyCount / classifiedCount * 100}% ${(earlyCount + onTimeCount) / classifiedCount * 100}%, #f97316 ${(earlyCount + onTimeCount) / classifiedCount * 100}% 100%)`
+    : '#e7e5e4';
 
   const rows = [
     { icon: <User className="h-4 w-4 text-stone-400 mt-0.5 shrink-0" />, label: 'Full Name', value: account?.fullName || '—' },
@@ -94,6 +112,79 @@ export default function TeacherSettings({ session, account, staffRecord, onBack,
           <Settings className="h-5 w-5 text-[#4a5d4e]" />
           <h2 className="text-base font-serif font-bold text-[#2c332d]">Settings</h2>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setAttendanceAnalysisOpen((open) => !open)}
+          className="w-full bg-white rounded-2xl border border-stone-200 shadow-sm p-4 flex items-center justify-between text-left hover:border-[#4a5d4e]"
+        >
+          <span className="flex items-center gap-2 text-sm font-bold text-[#2c332d]"><ChartNoAxesCombined className="h-4 w-4 text-[#4a5d4e]" /> Attendance Analysis (উপস্থিতির বিশ্লেষণ)</span>
+          <span className="text-xs font-semibold text-[#4a5d4e]">{attendanceAnalysisOpen ? 'Hide' : 'Open'}</span>
+        </button>
+
+        {attendanceAnalysisOpen && (
+          <section className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5 space-y-5">
+            <div>
+              <h3 className="text-sm font-bold text-[#2c332d]">My Attendance (আমার উপস্থিতি)</h3>
+              <p className="text-[11px] text-stone-500 mt-1">Attendance based on your recorded QR scans. Days without records are not assumed absent.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="rounded-xl bg-emerald-50 border border-emerald-200 p-3">
+                <p className="text-[10px] font-bold text-emerald-700">Recorded attendance days</p>
+                <p className="text-xl font-black text-emerald-800">{personalRecords.length}</p>
+              </div>
+              <div className="rounded-xl bg-sky-50 border border-sky-200 p-3">
+                <p className="text-[10px] font-bold text-sky-700">Checked-out days</p>
+                <p className="text-xl font-black text-sky-800">{personalRecords.filter((record) => record.exitTime).length}</p>
+              </div>
+              <div className="rounded-xl bg-amber-50 border border-amber-200 p-3">
+                <p className="text-[10px] font-bold text-amber-700">Late arrivals</p>
+                <p className="text-xl font-black text-amber-800">{lateCount}</p>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-[auto_1fr] gap-5 items-center">
+              <div className="relative h-36 w-36 rounded-full mx-auto" style={{ background: donutBackground }} role="img" aria-label={`Arrival classification: ${earlyCount} early, ${onTimeCount} on time, ${lateCount} late`}>
+                <div className="absolute inset-5 rounded-full bg-white flex flex-col items-center justify-center">
+                  <span className="text-2xl font-black text-[#2c332d]">{classifiedCount}</span>
+                  <span className="text-[9px] font-bold text-stone-500">CLASSIFIED</span>
+                </div>
+              </div>
+              <div className="space-y-2 text-xs">
+                <p className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-teal-600" /> Early: <strong>{earlyCount}</strong></p>
+                <p className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-green-500" /> On time: <strong>{onTimeCount}</strong></p>
+                <p className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-orange-500" /> Late: <strong>{lateCount}</strong></p>
+                {!classifiedCount && <p className="text-stone-500">Arrival classifications will appear after your next attendance scan.</p>}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-[#2c332d] mb-3">Last 14 days</p>
+              <div className="flex items-end gap-1.5 h-28 border-b border-stone-200">
+                {last14Days.map(({ date, record }) => (
+                  <div key={date} className="flex-1 h-full flex flex-col justify-end items-center gap-1" title={`${date}: ${record?.entryTime ? formatAttendanceTime(record.entryTime) : 'No scan recorded'}`}>
+                    <div
+                      className={`w-full max-w-5 rounded-t ${record?.arrivalStatus === 'late' ? 'bg-orange-500' : record?.arrivalStatus === 'early' ? 'bg-teal-600' : record ? 'bg-green-500' : 'bg-stone-100'}`}
+                      style={{ height: record ? '75%' : '8%' }}
+                    />
+                    <span className="text-[8px] text-stone-500">{date.slice(8)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-3 mt-2 text-[9px] text-stone-500"><span>Green: on time / not classified</span><span className="text-teal-700">Teal: early</span><span className="text-orange-600">Orange: late</span></div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-xs font-bold text-[#2c332d]">Recent attendance details</p>
+              {personalRecords.slice(0, 14).map((record) => (
+                <div key={record.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-stone-50 border border-stone-100 px-3 py-2 text-[11px]">
+                  <span className="font-mono font-bold text-stone-600">{record.date}</span>
+                  <span className="flex items-center gap-1 text-stone-600"><Clock className="h-3 w-3" />{record.entryTime ? formatAttendanceTime(record.entryTime) : '—'}{record.exitTime ? ` → ${formatAttendanceTime(record.exitTime)}` : ''}</span>
+                  <span className={`font-bold ${record.arrivalStatus === 'late' ? 'text-orange-600' : record.arrivalStatus === 'early' ? 'text-teal-700' : 'text-emerald-700'}`}>{record.arrivalStatus || (record.entryTime ? 'Recorded' : 'No arrival')}</span>
+                </div>
+              ))}
+              {!personalRecords.length && <p className="text-xs text-stone-500">No attendance records yet.</p>}
+            </div>
+            {todayRecord?.entryTime && <p className="flex items-center gap-2 rounded-lg bg-[#f5f2ed] px-3 py-2 text-xs text-[#4a5d4e]"><CalendarCheck className="h-4 w-4" /> Today: arrived at {formatAttendanceTime(todayRecord.entryTime)}{todayRecord.exitTime ? ` and left at ${formatAttendanceTime(todayRecord.exitTime)}` : ''}</p>}
+          </section>
+        )}
 
         {/* Profile details card (read-only) */}
         <div className="bg-white rounded-2xl border border-stone-200 shadow-sm p-5">

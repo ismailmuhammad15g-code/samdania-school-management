@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Student } from '../types';
 import { dbRefreshKey } from './localDb';
 import { isClassMatch, normalizeForComparison, studentMatchesQuery } from './digitUtils';
+import { isStudentActive } from './studentEnrollment';
 
 export type StudentStorageKey = 'samdani_students' | 'samdani_hifz_students';
 
@@ -45,7 +46,7 @@ export interface UseLiveStudentSearchResult {
 }
 
 function filterStudents(list: Student[], query: string, classFilter: string): Student[] {
-  const classStudents = list.filter((student) => isClassMatch(student.class, classFilter));
+  const classStudents = list.filter((student) => isStudentActive(student) && isClassMatch(student.class, classFilter));
   const normalizedQuery = normalizeForComparison(query);
   if (/^\d+$/.test(normalizedQuery)) {
     const exactRollMatches = classStudents.filter(
@@ -77,7 +78,7 @@ export function useLiveStudentSearch({
   const [results, setResults] = useState<Student[]>(() =>
     filterStudents(fallbackStudents, '', initialClassFilter)
   );
-  const [totalCount, setTotalCount] = useState(fallbackStudents.length);
+  const [totalCount, setTotalCount] = useState(fallbackStudents.filter(isStudentActive).length);
   const [renderKey, setRenderKey] = useState(0);
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -130,9 +131,10 @@ export function useLiveStudentSearch({
         class: s?.class != null ? String(s.class) : '',
       }));
 
-      const filtered = filterStudents(normalized, debouncedQuery, classFilter);
+      const activeStudents = normalized.filter(isStudentActive);
+      const filtered = filterStudents(activeStudents, debouncedQuery, classFilter);
 
-      setTotalCount(normalized.length);
+      setTotalCount(activeStudents.length);
       setResults(filtered);
       // Force a brand-new results tree so duplicate React keys cannot leave a stale DOM.
       setRenderKey((k) => k + 1);
@@ -150,7 +152,7 @@ export function useLiveStudentSearch({
     if (loading) return;
     if (query.trim() !== debouncedQuery.trim()) return;
     const filtered = filterStudents(fallbackStudents, debouncedQuery, classFilter);
-    setTotalCount(fallbackStudents.length);
+    setTotalCount(fallbackStudents.filter(isStudentActive).length);
     setResults(filtered);
     setRenderKey((k) => k + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to inbound student list changes

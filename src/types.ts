@@ -40,6 +40,18 @@ export interface Student {
   water: number;
   waiver: number;
   advancePaid: number;
+  academicSession?: number;
+  enrollmentStatus?: 'active' | 'left' | 'transferred';
+  transferBranch?: string;
+  enrollmentHistory?: StudentEnrollmentHistory[];
+}
+
+export interface StudentEnrollmentHistory {
+  session: number;
+  className: string;
+  outcome: 'admitted' | 'promoted' | 'retained' | 'left' | 'transferred';
+  recordedAt: string;
+  branch?: string;
 }
 
 export interface FeePayment {
@@ -72,6 +84,7 @@ export interface TeacherStaff {
   role: 'Teacher' | 'Staff';
   designation: string;
   baseSalary: number;
+  salaryDueAdjustment?: number;
   contact: string;
   email: string;
   bio: string;
@@ -206,6 +219,10 @@ export interface AttendanceQRSet {
   days: AttendanceQRDay[];  // 12 days
 }
 
+export interface AttendancePolicy {
+  expectedArrivalTime: string;
+}
+
 // One teacher's attendance for one day (entry = arrived, exit = left).
 export interface AttendanceRecord {
   id: string;               // `${teacherId}_${date}`
@@ -214,6 +231,7 @@ export interface AttendanceRecord {
   date: string;             // YYYY-MM-DD
   entryTime: string | null; // ISO timestamp of first (arrival) scan
   exitTime: string | null;  // ISO timestamp of second (departure) scan
+  arrivalStatus?: 'early' | 'on-time' | 'late';
 }
 
 export interface SalaryPayment {

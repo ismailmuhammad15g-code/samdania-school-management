@@ -22,7 +22,7 @@ type Notice = {
 };
 
 const NOTIFICATIONS_KEY = 'samdani_notifications';
-const SMS_API_URL = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3015';
+const SMS_API_URL = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3018';
 
 function readNotices(): Notice[] {
   const value = dbGet(NOTIFICATIONS_KEY);

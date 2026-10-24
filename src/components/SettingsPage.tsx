@@ -3,7 +3,7 @@ import { getAdminEmail, changeAdminEmail, changeAdminPassword } from '../lib/aut
 import { dbExportAll, dbImportAll, dbWipeAll } from '../lib/localDb';
 import PasswordConfirmModal from './PasswordConfirmModal';
 import QrGenerateSection from './QrGenerateSection';
-import { AttendanceQRSet, AttendanceRecord } from '../types';
+import { AttendancePolicy, AttendanceQRSet, AttendanceRecord } from '../types';
 import { Shield, Mail, Lock, Save, AlertCircle, CheckCircle, Eye, EyeOff, Database, Download, Upload, Plus, Trash2, GraduationCap, CreditCard, Users } from 'lucide-react';
 
 interface SettingsPageProps {
@@ -15,6 +15,8 @@ interface SettingsPageProps {
   onUpdateAdmins: (admins: string[]) => void;
   attendanceQRSet: AttendanceQRSet | null;
   attendanceRecords: AttendanceRecord[];
+  attendancePolicy: AttendancePolicy;
+  onUpdateAttendancePolicy: (policy: AttendancePolicy) => void;
   onGenerateAttendanceQRSet: (startDate: string) => void;
   onDeleteAttendanceQRSet: () => void;
   onClearFeePayments: () => void;
@@ -23,7 +25,7 @@ interface SettingsPageProps {
   readOnly?: boolean;
 }
 
-export default function SettingsPage({ academicClasses, onUpdateAcademicClasses, paymentMethods, onUpdatePaymentMethods, admins, onUpdateAdmins, attendanceQRSet, attendanceRecords, onGenerateAttendanceQRSet, onDeleteAttendanceQRSet, onClearFeePayments, onClearLoanData, onClearAttendance, readOnly }: SettingsPageProps) {
+export default function SettingsPage({ academicClasses, onUpdateAcademicClasses, paymentMethods, onUpdatePaymentMethods, admins, onUpdateAdmins, attendanceQRSet, attendanceRecords, attendancePolicy, onUpdateAttendancePolicy, onGenerateAttendanceQRSet, onDeleteAttendanceQRSet, onClearFeePayments, onClearLoanData, onClearAttendance, readOnly }: SettingsPageProps) {
   const currentEmail = getAdminEmail();
   const [email, setEmail] = useState(currentEmail);
   const [emailPassword, setEmailPassword] = useState('');
@@ -441,6 +443,21 @@ export default function SettingsPage({ academicClasses, onUpdateAcademicClasses,
       </div>
 
       {/* Attendance QR Codes */}
+      {!readOnly && (
+        <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-5 space-y-2">
+          <h3 className="text-sm font-bold text-[#2c332d]">Teacher Arrival Time (শিক্ষকের আগমনের সময়)</h3>
+          <p className="text-xs text-stone-500">Arrivals before this time are marked early; after it they are marked late. Change this cutoff whenever the school schedule changes.</p>
+          <label className="block max-w-xs text-xs font-semibold text-stone-600">
+            Expected arrival
+            <input
+              type="time"
+              value={attendancePolicy.expectedArrivalTime}
+              onChange={(event) => onUpdateAttendancePolicy({ ...attendancePolicy, expectedArrivalTime: event.target.value })}
+              className="mt-1 block w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 font-mono"
+            />
+          </label>
+        </div>
+      )}
       {!readOnly && (
         <QrGenerateSection
           qrSet={attendanceQRSet}

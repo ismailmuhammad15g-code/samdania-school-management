@@ -27,6 +27,35 @@ type AdmissionResponse = {
   message?: string;
 };
 
+const APP_DOWNLOAD_URL = "https://github.com/ismailmuhammad15g-code/samdania-madrasah-app/releases/download/app/app-debug.apk";
+const APP_LOGO_URL = "https://i.ibb.co.com/gb5b5CYR/logo2.png";
+
+const APP_FEATURES_EN = [
+  ["🎓", "Smart Student Dashboard", "See your academic profile, student ID information, and class details in one place."],
+  ["🕒", "Real-time Attendance", "Check daily attendance records with cloud synchronization."],
+  ["🪪", "Digital ID Card", "Access your official student identity card from your phone."],
+  ["📊", "Results & Academic Tracking", "View examination results, progress reports, and academic syllabus."],
+  ["📚", "Routine & Homework", "Keep up with class schedules and daily homework."],
+  ["👩‍🏫", "Teacher Portal", "A dedicated portal for teachers to manage academic information."],
+  ["💳", "Fees & Payment History", "Review payment records and pending fees transparently."],
+  ["🏆", "Islamic Quiz Contest", "Take part in daily Islamic and general knowledge quizzes."],
+  ["🔔", "Instant Notifications", "Receive official notices and updates through push alerts."],
+  ["📶", "Professional Experience", "Modern interface, skeleton loading, and network-status alerts."],
+];
+
+const APP_FEATURES_BN = [
+  ["🎓", "স্মার্ট স্টুডেন্ট ড্যাশবোর্ড", "এক জায়গায় একাডেমিক প্রোফাইল, শিক্ষার্থী আইডি ও শ্রেণির তথ্য দেখুন।"],
+  ["🕒", "রিয়েল-টাইম উপস্থিতি", "ক্লাউড সিঙ্ক্রোনাইজেশনের মাধ্যমে প্রতিদিনের হাজিরার রেকর্ড দেখুন।"],
+  ["🪪", "ডিজিটাল আইডি কার্ড", "মোবাইল থেকেই আপনার অফিসিয়াল শিক্ষার্থী পরিচয়পত্র ব্যবহার করুন।"],
+  ["📊", "রেজাল্ট ও একাডেমিক অগ্রগতি", "পরীক্ষার ফলাফল, প্রগতি প্রতিবেদন ও একাডেমিক সিলেবাস দেখুন।"],
+  ["📚", "রুটিন ও বাড়ির কাজ", "ক্লাসের সময়সূচী ও প্রতিদিনের বাড়ির কাজ সম্পর্কে আপডেট থাকুন।"],
+  ["👩‍🏫", "শিক্ষক পোর্টাল", "শিক্ষকদের জন্য একাডেমিক তথ্য পরিচালনার বিশেষ পোর্টাল।"],
+  ["💳", "ফি ও পেমেন্টের ইতিহাস", "পেমেন্ট রেকর্ড ও বকেয়া ফি স্বচ্ছভাবে যাচাই করুন।"],
+  ["🏆", "ইসলামিক কুইজ প্রতিযোগিতা", "দৈনিক ইসলামিক ও সাধারণ জ্ঞানভিত্তিক কুইজে অংশ নিন।"],
+  ["🔔", "তাৎক্ষণিক বিজ্ঞপ্তি", "পুশ অ্যালার্টের মাধ্যমে অফিসিয়াল নোটিশ ও আপডেট পান।"],
+  ["📶", "আধুনিক ব্যবহার অভিজ্ঞতা", "আধুনিক ইন্টারফেস, স্কেলেটন লোডিং ও ইন্টারনেট সংযোগের সতর্কতা।"],
+];
+
 function LoadingImage({
   src,
   alt,
@@ -72,7 +101,8 @@ export default function SchoolSite() {
   const pathname = usePathname();
   const isAdmissionPage = pathname === "/admission";
   const isAboutPage = pathname === "/about";
-  const isHomePage = !isAdmissionPage && !isAboutPage;
+  const isAppPage = pathname === "/app";
+  const isHomePage = !isAdmissionPage && !isAboutPage && !isAppPage;
   const [isBengali, setIsBengali] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [gallery, setGallery] = useState<UploadedImage[]>([]);
@@ -141,6 +171,7 @@ export default function SchoolSite() {
         gallery: "গ্যালারি",
         admission: "ভর্তির আবেদন",
         about: "আমাদের সম্পর্কে",
+        appDownload: "অ্যাপ ডাউনলোড",
         teachers: "শিক্ষকবৃন্দ",
         teachersIntro: "আমাদের শিক্ষকমণ্ডলীর পরিচিতি",
         noTeachers: "শিক্ষক পরিচিতি শিগগিরই প্রকাশ করা হবে।",
@@ -194,6 +225,14 @@ export default function SchoolSite() {
         required: "অনুগ্রহ করে সব আবশ্যিক তথ্য পূরণ করুন এবং সম্মতি দিন।",
         language: "English",
         footer: "অফিশিয়াল ওয়েবসাইট",
+        appTagline: "ডিজিটাল উৎকর্ষতার মাধ্যমে শিক্ষার অগ্রযাত্রা",
+        appWelcome: "সামদানিয়া তা'লীমুল ইসলাম মাদ্রাসা, গলাচিপার অফিসিয়াল ডিজিটাল গেটওয়েতে আপনাকে স্বাগতম।",
+        appIntro: "শিক্ষার্থী, অভিভাবক ও শিক্ষকদের জন্য সহজ একাডেমিক অভিজ্ঞতা—হাজিরা থেকে ফলাফল, প্রয়োজনীয় সবকিছু এখন হাতের মুঠোয়।",
+        appFeatures: "অ্যাপের মূল সুবিধাসমূহ",
+        downloadNow: "এখনই অ্যাপ ডাউনলোড করুন",
+        appClosing: "মাদ্রাসা ব্যবস্থাপনার ডিজিটাল ভবিষ্যতের সঙ্গে যুক্ত থাকুন। সামদানিয়া মাদ্রাসার ডিজিটাল যাত্রায় আমাদের সঙ্গী হোন।",
+        androidApk: "অ্যান্ড্রয়েড অ্যাপ (APK)",
+        appCopyright: "অ্যাপ ও ওয়েবসাইটের সর্বস্বত্ব সংরক্ষিত।",
       }
     : {
         official: "Official website",
@@ -202,6 +241,7 @@ export default function SchoolSite() {
         gallery: "Gallery",
         admission: "Admission request",
         about: "About us",
+        appDownload: "Download app",
         teachers: "Our teachers",
         teachersIntro: "Meet our teaching team",
         noTeachers: "Teacher profiles will be published here soon.",
@@ -255,6 +295,14 @@ export default function SchoolSite() {
         required: "Complete the required fields and consent before sending.",
         language: "বাংলা",
         footer: "Official website",
+        appTagline: "Empowering Education through Digital Excellence",
+        appWelcome: "Welcome to the official digital gateway of Samdania Talimul Islam Madrasah, Galachipa.",
+        appIntro: "Designed for students, parents, and teachers, the app brings attendance, results, and essential academic services together in one convenient place.",
+        appFeatures: "Explore the app features",
+        downloadNow: "Download the app now",
+        appClosing: "Experience the future of Madrasah management. Stay connected and stay updated with Samdania Madrasah.",
+        androidApk: "Android app (APK)",
+        appCopyright: "App and website. All rights reserved.",
       };
 
   const name = isBengali ? SCHOOL_NAME_BN : SCHOOL_NAME;
@@ -341,6 +389,7 @@ export default function SchoolSite() {
             {isHomePage && <Link href="/#gallery">{t.gallery}</Link>}
             <Link href="/about">{t.about}</Link>
             <Link href="/admission">{t.admission}</Link>
+            <Link href="/app">{t.appDownload}</Link>
           </nav>
 
           <div className="mobile-nav">
@@ -379,17 +428,77 @@ export default function SchoolSite() {
             {isHomePage && <Link href="/#gallery" onClick={closeMobileMenu}>{t.gallery}</Link>}
             <Link href="/about" onClick={closeMobileMenu}>{t.about}</Link>
             <Link href="/admission" onClick={closeMobileMenu}>{t.admission}</Link>
+            <Link href="/app" onClick={closeMobileMenu}>{t.appDownload}</Link>
           </nav>
         )}
       </header>
 
       <main>
+        {isAppPage && <section className="app-download-section">
+          <div className="section-inner">
+            <div className="app-download-hero">
+              <div className="app-download-copy">
+                <span className="eyebrow">{isBengali ? "অফিশিয়াল মাদ্রাসা অ্যাপ" : "Official Madrasah App"}</span>
+                <h1>{isBengali ? "সামদানিয়া তালিমুল ইসলাম মাদ্রাসা অ্যাপ" : "Samdania Talimul Islam Madrasah Official App"}</h1>
+                <p className="app-tagline">{t.appTagline}</p>
+                <p className="app-welcome">{t.appWelcome}</p>
+                <p className="app-intro">{t.appIntro}</p>
+                <a className="button-primary app-download-button" href={APP_DOWNLOAD_URL} download>
+                  <span aria-hidden="true">⬇</span>
+                  {t.downloadNow}
+                </a>
+                <p className="app-platform">{t.androidApk}</p>
+              </div>
+              <div className="app-logo-wrap">
+                <LoadingImage
+                  src={APP_LOGO_URL}
+                  alt={isBengali ? "সামদানিয়া মাদ্রাসা অ্যাপের লোগো" : "Samdania Madrasah app logo"}
+                  className="app-logo"
+                  priority
+                />
+              </div>
+            </div>
+
+            <div className="app-features">
+              <div className="section-heading">
+                <div>
+                  <span className="eyebrow">{isBengali ? "এক অ্যাপে প্রয়োজনীয় সেবা" : "Everything you need in one app"}</span>
+                  <h2>{t.appFeatures}</h2>
+                </div>
+              </div>
+              <div className="app-feature-grid">
+                {(isBengali ? APP_FEATURES_BN : APP_FEATURES_EN).map(([icon, title, description]) => (
+                  <article className="app-feature-card" key={title}>
+                    <span className="app-feature-icon" aria-hidden="true">{icon}</span>
+                    <div>
+                      <h3>{title}</h3>
+                      <p>{description}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <div className="app-download-cta">
+              <h2>{t.downloadNow}</h2>
+              <p>{t.appClosing}</p>
+              <a className="button-primary app-download-button" href={APP_DOWNLOAD_URL} download>
+                <span aria-hidden="true">⬇</span>
+                {t.downloadNow}
+              </a>
+            </div>
+          </div>
+        </section>}
+
         {isHomePage && <section className="hero" id="home">
           <div className="section-inner hero-grid">
             <div className="hero-copy">
               <span className="eyebrow">{t.official}</span>
               <h1>{name}</h1>
               <p className="hero-subtitle">{isBengali ? SCHOOL_NAME : SCHOOL_NAME_BN}</p>
+              <p className="hero-motto" lang="bn">
+                অভিভাবকের ইচ্ছা, শিক্ষার্থীর প্রচেষ্টা, প্রতিষ্ঠানের জবাবদিহিতা এবং আল্লাহর কবুলের উপর আস্থার আশায়....
+              </p>
               <div className="hero-actions">
                 <Link className="button-primary" href="/admission">{t.admission}</Link>
                 <Link className="button-secondary" href="/#gallery">{t.photos}</Link>
@@ -650,7 +759,11 @@ export default function SchoolSite() {
 
       <footer className="site-footer">
         <div className="footer-inner">
-          <p>{name} · {t.footer}</p>
+          <div className="footer-school">
+            <strong>{SCHOOL_NAME}</strong>
+            <span lang="bn">{SCHOOL_NAME_BN}</span>
+            <small>© 2026 {SCHOOL_NAME}. {t.appCopyright}</small>
+          </div>
           <div className="footer-socials">
             {SOCIAL_LINKS.map((social) => (
               <a href={social.href} key={social.label} target="_blank" rel="noreferrer">

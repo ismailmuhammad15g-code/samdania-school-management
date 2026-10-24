@@ -5,6 +5,7 @@ import type { AttendanceQRSet, AttendanceRecord, SalaryPayment, StaffAccount, Te
 import type { AttendanceScanResult } from '../lib/attendance';
 import AttendanceSection from './AttendanceSection';
 import StaffNoticeboard from './StaffNoticeboard';
+import { getSalaryBalance } from '../lib/salary';
 
 interface StaffDashboardProps {
   account: StaffAccount;
@@ -47,19 +48,7 @@ export default function StaffDashboard({
     : 0;
   const remaining = useMemo(() => {
     if (!staffRecord) return 0;
-    const joined = staffRecord.joinedAt ? new Date(staffRecord.joinedAt) : new Date(account.createdAt);
-    const validJoin = Number.isNaN(joined.getTime()) ? now : joined;
-    const firstMonth = validJoin.getFullYear() * 12 + validJoin.getMonth();
-    const currentMonth = now.getFullYear() * 12 + now.getMonth();
-    const accrued = Math.max(1, currentMonth - firstMonth + 1) * staffRecord.baseSalary;
-    const paid = salaryPayments.filter((payment) => {
-      if (payment.teacherStaffId !== staffRecord.id) return false;
-      const monthIndex = MONTHS.indexOf(payment.month);
-      if (monthIndex < 0) return false;
-      const monthKey = payment.year * 12 + monthIndex;
-      return monthKey >= firstMonth && monthKey <= currentMonth;
-    }).reduce((sum, payment) => sum + payment.netPaid, 0);
-    return Math.max(0, accrued - paid);
+    return getSalaryBalance(staffRecord, salaryPayments, MONTHS[now.getMonth()], now.getFullYear(), account.createdAt).remaining;
   }, [account.createdAt, now, salaryPayments, staffRecord]);
 
   const submitLeave = (event: React.FormEvent) => {

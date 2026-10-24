@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { ScanLine, CheckCircle2, LogIn, LogOut, XCircle, Clock, AlertTriangle, Fingerprint, Loader2, CalendarOff } from 'lucide-react';
 import QrScanner from './QrScanner';
-import { playBeep, type AttendanceScanResult } from '../lib/attendance';
+import { formatAttendanceTime, playBeep, type AttendanceScanResult } from '../lib/attendance';
 import { AttendanceQRSet, AttendanceRecord } from '../types';
 
 interface AttendanceSectionProps {
@@ -11,8 +11,7 @@ interface AttendanceSectionProps {
 }
 
 function fmtTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return formatAttendanceTime(iso);
 }
 
 export default function AttendanceSection({ qrSet, todayRecord, onScan }: AttendanceSectionProps) {
@@ -47,14 +46,20 @@ export default function AttendanceSection({ qrSet, todayRecord, onScan }: Attend
   if (scannerOpen && phase === 'result' && result) {
     const cfg = (() => {
       switch (result.status) {
-        case 'arrived':
+        case 'arrived': {
+          const arrivalMessage = result.arrivalStatus === 'late'
+            ? 'You arrived late (আপনি দেরিতে এসেছেন)'
+            : result.arrivalStatus === 'early'
+              ? 'You arrived early (আপনি সময়ের আগে এসেছেন)'
+              : 'You arrived on time (আপনি সময়মতো এসেছেন)';
           return {
             icon: <LogIn className="h-9 w-9 text-emerald-600" />,
-            title: 'Verified — You Have Arrived',
-            sub: 'আপনি উপস্থিত হয়েছেন (নিবন্ধিত)',
+            title: result.arrivalStatus === 'late' ? 'Arrived Late' : result.arrivalStatus === 'early' ? 'Arrived Early' : 'Arrived On Time',
+            sub: arrivalMessage,
             detail: `Arrival time: ${fmtTime(result.time)}`,
-            tone: 'emerald' as const,
+            tone: result.arrivalStatus === 'late' ? 'amber' as const : 'emerald' as const,
           };
+        }
         case 'departed':
           return {
             icon: <LogOut className="h-9 w-9 text-sky-600" />,
@@ -209,9 +214,9 @@ export default function AttendanceSection({ qrSet, todayRecord, onScan }: Attend
             )}
             <p className="text-[11px] font-semibold text-stone-700">
               {hasLeft ? (
-                <>Present · Checked out at <span className="font-bold">{fmtTime(todayRecord!.exitTime!)}</span></>
+                <>Present{todayRecord?.arrivalStatus ? ` · ${todayRecord.arrivalStatus === 'on-time' ? 'On time' : todayRecord.arrivalStatus === 'early' ? 'Early' : 'Late'}` : ''} · Arrived at <span className="font-bold">{fmtTime(todayRecord!.entryTime!)}</span> · Checked out at <span className="font-bold">{fmtTime(todayRecord!.exitTime!)}</span></>
               ) : hasEntered ? (
-                <>Present · Arrived at <span className="font-bold">{fmtTime(todayRecord!.entryTime!)}</span></>
+                <>Present{todayRecord?.arrivalStatus ? ` · ${todayRecord.arrivalStatus === 'on-time' ? 'On time' : todayRecord.arrivalStatus === 'early' ? 'Early' : 'Late'}` : ''} · Arrived at <span className="font-bold">{fmtTime(todayRecord!.entryTime!)}</span></>
               ) : (
                 <>Not marked yet today — scan to record your arrival.</>
               )}

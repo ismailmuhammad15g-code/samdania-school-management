@@ -247,19 +247,47 @@ a {
 .hero h1 {
   max-width: 680px;
   margin: 22px 0 16px;
-  color: var(--green);
+  color: #123e30;
   font-family: Georgia, "SolaimanLipi", "Noto Serif Bengali", serif;
   font-size: clamp(40px, 6.5vw, 76px);
-  font-weight: 500;
-  letter-spacing: -0.055em;
+  font-weight: 700;
+  letter-spacing: -0.035em;
   line-height: 1.05;
+  -webkit-text-stroke: 2.5px #fff;
+  paint-order: stroke fill;
+  text-shadow:
+    0 2px 0 rgba(255, 255, 255, 0.95),
+    2px 0 0 rgba(255, 255, 255, 0.95),
+    0 -2px 0 rgba(255, 255, 255, 0.95),
+    -2px 0 0 rgba(255, 255, 255, 0.95),
+    0 5px 18px rgba(9, 35, 25, 0.8);
 }
 
 .hero-subtitle {
   margin: 0;
-  color: #738077;
+  color: #123e30;
   font-family: Georgia, "SolaimanLipi", "Noto Serif Bengali", serif;
   font-size: clamp(18px, 2.3vw, 24px);
+  font-weight: 700;
+  line-height: 1.5;
+  -webkit-text-stroke: 1px #fff;
+  paint-order: stroke fill;
+  text-shadow: 0 2px 10px rgba(9, 35, 25, 0.8);
+}
+
+.hero-motto {
+  max-width: 660px;
+  margin: 18px 0 0;
+  border-left: 3px solid var(--gold);
+  border-radius: 0 12px 12px 0;
+  background: rgba(13, 48, 36, 0.62);
+  padding: 12px 16px;
+  color: #fff;
+  font-family: "SolaimanLipi", "Noto Serif Bengali", Georgia, serif;
+  font-size: clamp(16px, 2vw, 21px);
+  font-weight: 600;
+  line-height: 1.8;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
 }
 
 .hero-actions {
@@ -885,6 +913,28 @@ a {
   margin: 0;
 }
 
+.footer-school {
+  display: grid;
+  gap: 4px;
+}
+
+.footer-school strong {
+  color: #fff;
+  font-size: 13px;
+}
+
+.footer-school span {
+  color: rgba(255, 255, 255, 0.82);
+  font-family: "SolaimanLipi", "Noto Sans Bengali", sans-serif;
+  font-size: 13px;
+}
+
+.footer-school small {
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 10px;
+}
+
 .footer-socials {
   display: flex;
   flex-wrap: wrap;
@@ -894,6 +944,163 @@ a {
 .footer-socials a {
   color: #e7c572;
   text-decoration: none;
+}
+
+.app-download-section {
+  padding: clamp(42px, 7vw, 82px) 0 72px;
+  background:
+    radial-gradient(ellipse at 85% 5%, rgba(201, 149, 53, 0.14), transparent 30%),
+    linear-gradient(180deg, #f7f5ed, #fff 50%, #f4f2e9);
+}
+
+.app-download-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(230px, 0.8fr);
+  align-items: center;
+  gap: clamp(36px, 8vw, 100px);
+  border: 1px solid rgba(20, 45, 36, 0.09);
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: clamp(26px, 6vw, 64px);
+  box-shadow: 0 24px 70px rgba(20, 45, 36, 0.09);
+}
+
+.app-download-copy h1 {
+  max-width: 700px;
+  margin: 18px 0 12px;
+  color: var(--green);
+  font-family: Georgia, "SolaimanLipi", "Noto Serif Bengali", serif;
+  font-size: clamp(32px, 4.3vw, 54px);
+  line-height: 1.15;
+}
+
+.app-tagline {
+  margin: 0 0 20px;
+  color: #a1701e;
+  font-size: clamp(15px, 2vw, 20px);
+  font-weight: 800;
+}
+
+.app-welcome,
+.app-intro {
+  max-width: 680px;
+  color: #53645a;
+  font-size: 15px;
+  line-height: 1.85;
+}
+
+.app-welcome {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.app-download-button {
+  gap: 10px;
+  margin-top: 16px;
+  padding: 0 26px;
+  box-shadow: 0 10px 22px rgba(18, 62, 48, 0.2);
+}
+
+.app-download-button span {
+  font-size: 17px;
+}
+
+.app-platform {
+  margin: 10px 0 0 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.app-logo-wrap {
+  position: relative;
+  width: min(100%, 330px);
+  aspect-ratio: 1;
+  justify-self: center;
+  overflow: hidden;
+  border: 1px solid rgba(201, 149, 53, 0.3);
+  border-radius: 32px;
+  background: #fff;
+  padding: 26px;
+  box-shadow: 0 24px 55px rgba(20, 45, 36, 0.13);
+}
+
+.app-logo {
+  object-fit: contain;
+}
+
+.app-features {
+  padding-top: clamp(56px, 8vw, 92px);
+}
+
+.app-feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.app-feature-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  border: 1px solid rgba(20, 45, 36, 0.09);
+  border-radius: 16px;
+  background: #fff;
+  padding: 20px;
+  box-shadow: 0 8px 24px rgba(20, 45, 36, 0.045);
+}
+
+.app-feature-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border-radius: 13px;
+  background: #f5f0e2;
+  font-size: 21px;
+}
+
+.app-feature-card h3 {
+  margin: 1px 0 7px;
+  color: var(--green);
+  font-size: 14px;
+}
+
+.app-feature-card p {
+  margin: 0;
+  color: #65736a;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.app-download-cta {
+  margin-top: clamp(48px, 7vw, 76px);
+  border-radius: 24px;
+  background: linear-gradient(120deg, #123e30, #285b45);
+  padding: clamp(28px, 5vw, 48px);
+  color: #fff;
+  text-align: center;
+}
+
+.app-download-cta h2 {
+  margin: 0 0 10px;
+  font-family: Georgia, "SolaimanLipi", "Noto Serif Bengali", serif;
+  font-size: clamp(24px, 4vw, 36px);
+}
+
+.app-download-cta p {
+  max-width: 680px;
+  margin: 0 auto;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.app-download-cta .app-download-button {
+  border-color: #fff;
+  background: #fff;
+  color: var(--green);
 }
 
 .spinner {
@@ -1091,6 +1298,44 @@ a {
   .footer-inner {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .app-download-hero {
+    grid-template-columns: 1fr;
+    gap: 30px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  .app-download-copy h1 {
+    margin-right: auto;
+    margin-left: auto;
+  }
+
+  .app-download-copy .eyebrow {
+    justify-content: center;
+  }
+
+  .app-logo-wrap {
+    width: min(72vw, 260px);
+    grid-row: 1;
+    border-radius: 24px;
+    padding: 18px;
+  }
+
+  .app-feature-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .app-feature-card {
+    gap: 12px;
+    padding: 15px;
+    text-align: left;
+  }
+
+  .app-download-cta {
+    padding: 28px 20px;
   }
 }
 
