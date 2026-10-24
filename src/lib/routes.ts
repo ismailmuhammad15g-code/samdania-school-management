@@ -17,6 +17,7 @@ export type AppTab =
   | 'pending'
   | 'assistant'
   | 'appManagement'
+  | 'mainMadrasah'
   | 'missingFillouts';
 
 export const TAB_PATHS: Record<AppTab, string> = {
@@ -34,6 +35,7 @@ export const TAB_PATHS: Record<AppTab, string> = {
   pending: '/pending',
   assistant: '/assistant',
   appManagement: '/app-management',
+  mainMadrasah: '/main-madrasah',
   missingFillouts: '/missing-fillouts',
 };
 

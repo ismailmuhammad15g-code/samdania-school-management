@@ -56,6 +56,7 @@ import QrGenerateSection from './components/QrGenerateSection';
 import AttendanceReportTab from './components/AttendanceReportTab';
 import PendingOperations from './components/PendingOperations';
 import AssistantModule from './components/AssistantModule';
+import MainMadrasahPage from './components/MainMadrasahPage';
 import AppManagementPage from './components/AppManagementPage';
 import MissingFilloutsPage from './components/MissingFilloutsPage';
 import { tabToPath, pathToTab, type AppTab } from './lib/routes';
@@ -64,6 +65,74 @@ import type { AgentActions } from './lib/aiTools';
 function accountIsNonTeachingStaff(account: TeacherAccount): boolean {
   const roleDescription = `${account.role || ''} ${account.designation || ''}`.toLowerCase();
   return /\b(staff|driver|cleaner|guard|security|accountant|cook|caretaker|peon|janitor|maintenance|office)\b/.test(roleDescription);
+}
+
+function AppLoadingSkeleton() {
+  return (
+    <div className="app-loading-skeleton min-h-screen bg-[#f8f7f4]" role="status" aria-label="Loading school software" aria-busy="true">
+      <span className="sr-only">Loading school software…</span>
+      <header className="h-16 border-b border-stone-200 bg-white px-4 sm:px-7 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-stone-200 animate-pulse" />
+          <div className="space-y-2">
+            <div className="h-3 w-36 sm:w-48 rounded bg-stone-200 animate-pulse" />
+            <div className="h-2 w-24 rounded bg-stone-100 animate-pulse" />
+          </div>
+        </div>
+        <div className="hidden sm:flex items-center gap-3">
+          <div className="h-8 w-24 rounded-lg bg-stone-100 animate-pulse" />
+          <div className="h-8 w-8 rounded-full bg-stone-200 animate-pulse" />
+        </div>
+      </header>
+      <div className="mx-auto flex max-w-[1600px]">
+        <aside className="hidden w-60 shrink-0 border-r border-stone-200 bg-white p-5 lg:block" aria-hidden="true">
+          <div className="mb-6 h-2 w-20 rounded bg-stone-100 animate-pulse" />
+          <div className="space-y-3">
+            {Array.from({ length: 8 }, (_, index) => (
+              <div key={index} className="flex items-center gap-3 rounded-lg px-2 py-2">
+                <div className="h-4 w-4 rounded bg-stone-200 animate-pulse" />
+                <div className="h-3 rounded bg-stone-100 animate-pulse" style={{ width: `${96 + (index % 3) * 18}px` }} />
+              </div>
+            ))}
+          </div>
+        </aside>
+        <main className="min-w-0 flex-1 p-4 sm:p-7 lg:p-9" aria-hidden="true">
+          <div className="mb-7 space-y-3">
+            <div className="h-6 w-48 rounded bg-stone-200 animate-pulse" />
+            <div className="h-3 w-64 max-w-full rounded bg-stone-100 animate-pulse" />
+          </div>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div key={index} className="h-24 rounded-xl border border-stone-200 bg-white p-4 sm:h-28">
+                <div className="h-3 w-20 rounded bg-stone-100 animate-pulse" />
+                <div className="mt-5 h-6 w-24 max-w-full rounded bg-stone-200 animate-pulse" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(240px,1fr)]">
+            <div className="h-64 rounded-xl border border-stone-200 bg-white p-5 sm:h-80">
+              <div className="h-4 w-36 rounded bg-stone-100 animate-pulse" />
+              <div className="mt-8 h-48 rounded-lg bg-stone-50 animate-pulse sm:h-64" />
+            </div>
+            <div className="h-64 rounded-xl border border-stone-200 bg-white p-5 sm:h-80">
+              <div className="h-4 w-32 rounded bg-stone-100 animate-pulse" />
+              <div className="mt-6 space-y-4">
+                {Array.from({ length: 5 }, (_, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-stone-100 animate-pulse" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 w-3/4 rounded bg-stone-100 animate-pulse" />
+                      <div className="h-2 w-1/2 rounded bg-stone-50 animate-pulse" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -181,7 +250,6 @@ export default function App() {
       }
     };
 
-    // Seed / migrate admin credentials into Supabase so login works on every device.
     ensureAdminCredentials();
 
     const sharedStudents = dbGet('students');
@@ -453,15 +521,15 @@ export default function App() {
     }
   }, [teacherAccounts, dbReady]);
 
-  // Check for existing admin session on mount
+  // Check for existing admin session on mount.
   useEffect(() => {
     const session = getSession();
     if (session) {
       setIsAuthenticated(true);
       setAdminReadOnly(getAdminReadOnlyFlag());
     }
-    setAuthLoading(false);
   }, []);
+  useEffect(() => { setAuthLoading(false); }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1437,22 +1505,7 @@ export default function App() {
     addLoan: handleAddLoan,
   };
 
-  if (!dbReady) {
-    return (
-      <div className="min-h-screen bg-[#2c332d] flex flex-col items-center justify-center gap-4">
-        <div className="animate-spin h-9 w-9 border-4 border-[#d9c5b2]/40 border-t-[#d9c5b2] rounded-full"></div>
-        <p className="text-[#d9c5b2] text-xs font-semibold tracking-wide">Opening local database…</p>
-      </div>
-    );
-  }
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-[#f8f7f4] flex items-center justify-center">
-        <div className="animate-spin h-8 w-8 border-4 border-[#1e2a20] border-t-transparent rounded-full"></div>
-      </div>
-    );
-  }
+  if (!dbReady || authLoading) return <AppLoadingSkeleton />;
 
   if (!isAuthenticated) {
     // Teacher already signed in → teacher dashboard
@@ -1667,8 +1720,13 @@ export default function App() {
             readOnly={adminReadOnly}
             teacherAccounts={teacherAccounts}
             staffAccounts={staffAccounts}
+            students={students}
             adminName={adminName}
           />
+        )}
+
+        {activeTab === 'mainMadrasah' && (
+          <MainMadrasahPage readOnly={adminReadOnly} teacherAccounts={teacherAccounts} />
         )}
 
         {activeTab === 'missingFillouts' && (

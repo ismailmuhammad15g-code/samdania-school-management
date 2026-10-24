@@ -8,7 +8,7 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(import.meta.env.VITE_ADMIN_EMAIL?.trim() ?? '');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,7 +31,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       } else {
         setError('Invalid email or password. Please try again.');
       }
-    } catch {
+    } catch (cause) {
+      console.error('Admin login failed.', cause);
       setError('Login failed. Please try again.');
     } finally {
       setLoading(false);
@@ -61,7 +62,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
               <Shield className="h-5 w-5 text-[#4a5d4e]" />
               <div>
                 <h2 className="text-sm font-bold text-[#2c332d]">Admin Login</h2>
-                <p className="text-[10px] text-stone-500">Use your admin email and password (default: admin@madrasah.com)</p>
+                <p className="text-[10px] text-stone-500">Use the administrator email and password configured for this software.</p>
               </div>
             </div>
 

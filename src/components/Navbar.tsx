@@ -20,7 +20,8 @@ import {
   FileText,
   ClipboardList,
   Eye,
-  Bot
+  Bot,
+  Globe2
   ,Megaphone
   ,FileWarning
 } from 'lucide-react';
@@ -45,6 +46,7 @@ const NAV_ITEMS = [
   { id: 'settings', label: 'Settings', icon: Settings },
   { id: 'assistant', label: 'Assistant', icon: Bot },
   { id: 'appManagement', label: 'App Management', icon: Megaphone },
+  { id: 'mainMadrasah', label: 'Main Madrasah', icon: Globe2 },
   { id: 'missingFillouts', label: 'Missing Fillouts', icon: FileWarning },
 ];
 

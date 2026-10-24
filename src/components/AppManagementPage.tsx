@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Bell, Megaphone, Plus, Send, Trash2 } from 'lucide-react';
 import { dbGet, dbSet, onDbChange } from '../lib/localDb';
 import { Student } from '../types';
+import { formatBangladeshMobile, getSchoolSmsStatus, sendSchoolSms, type SmsProviderStatus } from '../lib/sms';
 import { getTeacherNotices, saveTeacherNotices, type TeacherNotice } from '../lib/teacherNotices';
 import { TeacherAccount } from '../types';
 import { getStaffNotices, saveStaffNotices, type StaffNotice } from '../lib/staffNotices';
@@ -21,6 +22,7 @@ type Notice = {
 };
 
 const NOTIFICATIONS_KEY = 'samdani_notifications';
+const SMS_API_URL = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3015';
 
 function readNotices(): Notice[] {
   const value = dbGet(NOTIFICATIONS_KEY);
@@ -31,15 +33,22 @@ interface AppManagementPageProps {
   readOnly?: boolean;
   teacherAccounts: TeacherAccount[];
   staffAccounts: StaffAccount[];
+  students: Student[];
   adminName: string;
 }
 
-export default function AppManagementPage({ readOnly = false, teacherAccounts, staffAccounts, adminName }: AppManagementPageProps) {
+export default function AppManagementPage({ readOnly = false, teacherAccounts, staffAccounts, students, adminName }: AppManagementPageProps) {
   const [notices, setNotices] = useState<Notice[]>(readNotices);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isBreaking, setIsBreaking] = useState(false);
   const [category, setCategory] = useState<Notice['category']>('General');
+  const [showNoticeDeliveryOptions, setShowNoticeDeliveryOptions] = useState(false);
+  const [sendingNoticeSms, setSendingNoticeSms] = useState(false);
+  const [smsStatusLoading, setSmsStatusLoading] = useState(false);
+  const [smsBalance, setSmsBalance] = useState('');
+  const [lastSmsRequestId, setLastSmsRequestId] = useState<string | number>();
+  const [smsReport, setSmsReport] = useState<SmsProviderStatus | null>(null);
   const [pushTitle, setPushTitle] = useState('');
   const [pushMessage, setPushMessage] = useState('');
   const [message, setMessage] = useState('');
@@ -74,8 +83,21 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, s
     dbSet(NOTIFICATIONS_KEY, next);
   };
 
-  const addNotice = (event: React.FormEvent) => {
+  const prepareNoticeDelivery = (event: React.FormEvent) => {
     event.preventDefault();
+    if (!title.trim() || !content.trim()) return;
+    setShowNoticeDeliveryOptions(true);
+  };
+
+  const resetNoticeDraft = () => {
+    setTitle('');
+    setContent('');
+    setIsBreaking(false);
+    setCategory('General');
+    setShowNoticeDeliveryOptions(false);
+  };
+
+  const addNoticeToApp = () => {
     if (!title.trim() || !content.trim()) return;
     const publishedAt = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     saveNotices([{
@@ -86,11 +108,38 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, s
       is_breaking: isBreaking,
       category,
     }, ...notices]);
-    setTitle('');
-    setContent('');
-    setIsBreaking(false);
-    setCategory('General');
+    resetNoticeDraft();
     setMessage('Notice saved for the Android app.');
+  };
+
+  const sendNoticeSms = async () => {
+    if (!title.trim() || !content.trim()) return;
+    const recipients = [...new Set(students
+      .map((student) => formatBangladeshMobile(student.contact))
+      .filter((number): number is string => number !== null))];
+    if (recipients.length === 0) {
+      setMessage('SMS not sent: no students have a valid Bangladesh guardian phone number.');
+      return;
+    }
+    if (!window.confirm(`Send this SMS notice to ${recipients.length} student guardian phone number(s)? This may incur SMS charges.`)) return;
+
+    setSendingNoticeSms(true);
+    setMessage('');
+    try {
+      const sms = await sendSchoolSms(
+        SMS_API_URL,
+        recipients,
+        `${title.trim()}\n${content.trim()}\nসামদানিয়া তালিমূল ইসলাম মাদ্রাসা`,
+      );
+      setLastSmsRequestId(sms.requestId);
+      setSmsReport(null);
+      resetNoticeDraft();
+      setMessage(`SMS notice submitted to ${sms.recipientCount} guardian number(s). Request ${sms.requestId}.`);
+    } catch (error) {
+      setMessage(`SMS notice could not be sent: ${error instanceof Error ? error.message : 'Unknown SMS error'}`);
+    } finally {
+      setSendingNoticeSms(false);
+    }
   };
 
   const sendPush = (event: React.FormEvent) => {
@@ -111,6 +160,33 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, s
   };
 
   const removeNotice = (id: string) => saveNotices(notices.filter((notice) => notice.id !== id));
+
+  const checkSmsBalance = async () => {
+    setSmsStatusLoading(true);
+    setMessage('');
+    try {
+      const status = await getSchoolSmsStatus(SMS_API_URL);
+      if (typeof status.balance !== 'string') throw new Error('The SMS provider did not return a balance.');
+      setSmsBalance(status.balance);
+    } catch (error) {
+      setMessage(`SMS balance could not be loaded: ${error instanceof Error ? error.message : 'Unknown SMS error'}`);
+    } finally {
+      setSmsStatusLoading(false);
+    }
+  };
+
+  const checkSmsReport = async () => {
+    if (lastSmsRequestId === undefined) return;
+    setSmsStatusLoading(true);
+    setMessage('');
+    try {
+      setSmsReport(await getSchoolSmsStatus(SMS_API_URL, lastSmsRequestId));
+    } catch (error) {
+      setMessage(`SMS report could not be loaded: ${error instanceof Error ? error.message : 'Unknown SMS error'}`);
+    } finally {
+      setSmsStatusLoading(false);
+    }
+  };
 
   const sendTeacherNotice = (event: React.FormEvent) => {
     event.preventDefault();
@@ -182,7 +258,7 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, s
         <h2 className="text-xl font-bold text-[#2c332d]">App Management</h2>
         <p className="text-xs text-stone-500 mt-1">Manage notices and notifications shared with the companion Android app.</p>
       </div>
-      {message && <p className="rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-4 py-3">{message}</p>}
+      {message && <p className={`rounded-lg border text-xs px-4 py-3 ${message.includes('could not') || message.includes('not sent') ? 'bg-amber-50 border-amber-200 text-amber-900' : 'bg-emerald-50 border-emerald-200 text-emerald-800'}`} role="status">{message}</p>}
 
       <div className="grid lg:grid-cols-2 gap-6">
         {!readOnly && <form onSubmit={sendTeacherNotice} className="bg-white border border-stone-200 rounded-xl p-5 space-y-4 lg:col-span-2">
@@ -230,13 +306,31 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, s
           <textarea value={staffNoticeMessage} onChange={(e) => setStaffNoticeMessage(e.target.value)} required placeholder="Notice message (নোটিশের বার্তা)" className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm h-24" />
           <button className="bg-[#4a5d4e] text-white rounded-lg px-4 py-2 text-xs font-bold flex items-center gap-2"><Send className="h-4 w-4" /> Send to Staff Portal (স্টাফ পোর্টালে পাঠান)</button>
         </form>}
-        {!readOnly && <form onSubmit={addNotice} className="bg-white border border-stone-200 rounded-xl p-5 space-y-4">
+        {!readOnly && <form onSubmit={prepareNoticeDelivery} className="bg-white border border-stone-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2"><Megaphone className="h-4 w-4 text-[#4a5d4e]" /><h3 className="font-bold text-sm">Create Notice</h3></div>
           <div><label className="block text-xs font-bold text-stone-600 mb-1">Notice Title</label><input value={title} onChange={(e) => setTitle(e.target.value)} required className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm" /></div>
           <div><label className="block text-xs font-bold text-stone-600 mb-1">Notice Content</label><textarea value={content} onChange={(e) => setContent(e.target.value)} required className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm h-28" /></div>
           <label className="block text-xs font-bold text-stone-600">Category<select value={category} onChange={(e) => setCategory(e.target.value as Notice['category'])} className="mt-1 w-full border border-stone-200 rounded-lg px-3 py-2 text-sm font-normal"><option>General</option><option>Admission</option><option>Exam</option></select></label>
           <label className="flex items-center gap-2 text-xs text-stone-700"><input type="checkbox" checked={isBreaking} onChange={(e) => setIsBreaking(e.target.checked)} /> Breaking notice</label>
-          <button className="bg-[#4a5d4e] text-white rounded-lg px-4 py-2 text-xs font-bold flex items-center gap-2"><Plus className="h-4 w-4" /> Save Notice</button>
+          {!showNoticeDeliveryOptions ? (
+            <button className="bg-[#4a5d4e] text-white rounded-lg px-4 py-2 text-xs font-bold flex items-center gap-2"><Send className="h-4 w-4" /> Send Notice</button>
+          ) : (
+            <div className="rounded-lg border border-stone-200 bg-stone-50 p-4 space-y-3">
+              <p className="text-xs font-bold text-stone-700">Choose how to deliver this notice:</p>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={addNoticeToApp} disabled={sendingNoticeSms} className="bg-[#4a5d4e] text-white rounded-lg px-4 py-2 text-xs font-bold flex items-center gap-2 disabled:opacity-50">
+                  <Plus className="h-4 w-4" /> Save to app
+                </button>
+                <button type="button" onClick={() => void sendNoticeSms()} disabled={sendingNoticeSms} className="bg-amber-700 text-white rounded-lg px-4 py-2 text-xs font-bold flex items-center gap-2 disabled:opacity-50">
+                  <Send className="h-4 w-4" /> {sendingNoticeSms ? 'Sending SMS…' : `Send SMS to guardians (${new Set(students.map((student) => formatBangladeshMobile(student.contact)).filter(Boolean)).size})`}
+                </button>
+                <button type="button" onClick={() => setShowNoticeDeliveryOptions(false)} disabled={sendingNoticeSms} className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-xs font-bold text-stone-700 disabled:opacity-50">
+                  Back to edit
+                </button>
+              </div>
+              <p className="text-[11px] text-stone-500">Bulk SMS may require an approved SMS.net.bd campaign content ID and may incur charges.</p>
+            </div>
+          )}
         </form>}
 
         {!readOnly && <form onSubmit={sendPush} className="bg-white border border-stone-200 rounded-xl p-5 space-y-4">
@@ -246,6 +340,36 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, s
           <button className="bg-[#4a5d4e] text-white rounded-lg px-4 py-2 text-xs font-bold flex items-center gap-2"><Send className="h-4 w-4" /> Send Notification</button>
         </form>}
       </div>
+
+      {!readOnly && (
+        <section className="bg-white border border-stone-200 rounded-xl p-5 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="font-bold text-sm">SMS status</h3>
+              <p className="mt-1 text-xs text-stone-500">Check the SMS.net.bd account balance or delivery report for the latest notice request.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" disabled={smsStatusLoading} onClick={() => void checkSmsBalance()} className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                {smsStatusLoading ? 'Checking…' : 'Check balance'}
+              </button>
+              {lastSmsRequestId !== undefined && (
+                <button type="button" disabled={smsStatusLoading} onClick={() => void checkSmsReport()} className="rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                  Check request {lastSmsRequestId}
+                </button>
+              )}
+            </div>
+          </div>
+          {smsBalance && <p className="text-xs text-stone-700">SMS balance: ৳{smsBalance}</p>}
+          {smsReport && (
+            <div className="rounded-lg bg-stone-50 p-3 text-xs text-stone-700">
+              <p>Request {smsReport.request_id}: {smsReport.request_status || 'Status unavailable'} · charge ৳{smsReport.request_charge || '0.0000'}</p>
+              {smsReport.recipients?.map((recipient) => (
+                <p key={recipient.number} className="mt-1">{recipient.number} · {recipient.status} · ৳{recipient.charge}</p>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="bg-white border border-stone-200 rounded-xl p-5">
         <h3 className="font-bold text-sm mb-4">Teacher Notices</h3>

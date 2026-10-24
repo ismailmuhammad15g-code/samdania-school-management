@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_AUTH_SALT?: string;
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_ANON_KEY?: string;
+  readonly VITE_MAIN_MADRASAH_API_URL?: string;
   readonly VITE_GROQ_API_KEY?: string;
   readonly VITE_GROQ_BASE_URL?: string;
   readonly VITE_GROQ_MODEL?: string;

@@ -58,7 +58,11 @@ let client: SupabaseClient | null = null;
 function getClient(): SupabaseClient {
   if (!client) {
     client = createClient(SUPABASE_URL, SUPABASE_ANON, {
-      auth: { persistSession: false, autoRefreshToken: false },
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        storageKey: 'samdania-school-data-no-auth-session',
+      },
     });
   }
   return client;
@@ -66,19 +70,6 @@ function getClient(): SupabaseClient {
 
 function enabled(): boolean {
   return Boolean(SUPABASE_URL && SUPABASE_ANON);
-}
-
-async function ensureSchema(): Promise<void> {
-  const res = await getClient().from(TABLE).select('key', { count: 'exact', head: true });
-  if (res.error) {
-    const msg = res.error.message || '';
-    if (/does not exist|relation/i.test(msg)) {
-      throw new Error(
-        'Supabase table "' + TABLE + '" not found. Run SQLs/01_kv_store.sql in the Supabase SQL editor.'
-      );
-    }
-    throw res.error;
-  }
 }
 
 async function pullAll(): Promise<{ data: Record<string, string>; keys: Set<string> }> {
@@ -288,18 +279,24 @@ export async function initDatabase(): Promise<void> {
   }
 
   try {
-    await ensureSchema();
-
     // ── ONE-TIME MIGRATION v3: wipe stale fee/loan/attendance test data from Supabase ──
     // Runs once ever per Supabase project. Checks for a marker row; if absent,
     // directly deletes the payment/loan/attendance rows from the remote table before loading,
     // then writes the marker so this never runs again on any device.
     const MIGRATION_KEY = 'samdani_migration_v3_cleared';
-    const markerRes = await getClient()
-      .from(TABLE)
-      .select('key')
-      .eq('key', MIGRATION_KEY)
-      .maybeSingle();
+    const [schemaCheck, markerRes] = await Promise.all([
+      getClient().from(TABLE).select('key', { count: 'exact', head: true }),
+      getClient().from(TABLE).select('key').eq('key', MIGRATION_KEY).maybeSingle(),
+    ]);
+    if (schemaCheck.error) {
+      const message = schemaCheck.error.message || '';
+      if (/does not exist|relation/i.test(message)) {
+        throw new Error(`Supabase table "${TABLE}" not found. Run SQLs/01_kv_store.sql in the Supabase SQL editor.`);
+      }
+      throw schemaCheck.error;
+    }
+    if (markerRes.error) throw markerRes.error;
+
     if (!markerRes.data) {
       // Marker absent → first run after deploy. Wipe the stale rows.
       const KEYS_TO_WIPE = [
@@ -311,11 +308,13 @@ export async function initDatabase(): Promise<void> {
         'samdani_student_attendance_records',
         'samdani_attendance_qrset'
       ];
-      await getClient().from(TABLE).delete().in('key', KEYS_TO_WIPE);
+      const deleteResult = await getClient().from(TABLE).delete().in('key', KEYS_TO_WIPE);
+      if (deleteResult.error) throw deleteResult.error;
       // Set the marker so migration never repeats.
-      await getClient()
+      const markerWrite = await getClient()
         .from(TABLE)
         .upsert({ key: MIGRATION_KEY, value: JSON.stringify(true) }, { onConflict: 'key' });
+      if (markerWrite.error) throw markerWrite.error;
       console.log('[localDb] Migration v3: wiped stale fee, loan, and attendance data from Supabase.');
     }
 

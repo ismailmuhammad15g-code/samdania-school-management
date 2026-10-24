@@ -6,6 +6,7 @@ import PasswordConfirmModal from './PasswordConfirmModal';
 import { parseNumberWithBengaliSupport, normalizeForComparison, isClassMatch } from '../lib/digitUtils';
 import { useLiveStudentSearch } from '../lib/useLiveStudentSearch';
 import { uploadStudentPhoto } from '../lib/imgbb';
+import { BENGALI_MONTHS, formatBangladeshMobile, sendSchoolSms } from '../lib/sms';
 import logo2 from '../assets/images/logo2.png';
 import { 
   Users, 
@@ -38,6 +39,7 @@ const feeNum = (v: unknown): number => {
   const n = parseNumberWithBengaliSupport(v);
   return Number.isFinite(n) ? n : 0;
 };
+const SMS_API_URL = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3015';
 
 interface FeesModuleProps {
   students: Student[];
@@ -86,6 +88,8 @@ export default function FeesModule({
   const [attendanceYear, setAttendanceYear] = useState<number>(new Date().getFullYear());
   const [attendancePrintMenuOpen, setAttendancePrintMenuOpen] = useState(false);
   const [attendancePrintMode, setAttendancePrintMode] = useState<'absent' | 'present' | 'all'>('all');
+  const [smsFeedback, setSmsFeedback] = useState('');
+  const [sendingAbsenceSmsId, setSendingAbsenceSmsId] = useState('');
   const sortedStudentAttendance = [...studentAttendanceRecords].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const attendanceByClass = useMemo(() => {
     const groups = new Map<string, StudentAttendanceRecord[]>();
@@ -421,7 +425,7 @@ export default function FeesModule({
   };
 
   // Collect Payment Form Submit
-  const handlePaymentSubmit = (e: React.FormEvent) => {
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStudent) {
       alert('Please select a student first.');
@@ -438,7 +442,7 @@ export default function FeesModule({
       return;
     }
 
-    onCollectPayment({
+    const payment = {
       studentId: selectedStudent.id,
       studentName: selectedStudent.name,
       class: selectedStudent.class,
@@ -455,7 +459,9 @@ export default function FeesModule({
       totalPayable: calculatedPayable,
       amountPaid: enteredCash,
       receivedBy: paymentFormData.receivedBy,
-    });
+    };
+    onCollectPayment(payment);
+    const studentForSms = selectedStudent;
 
     // Reset payment states
     setSelectedStudent(null);
@@ -475,6 +481,51 @@ export default function FeesModule({
     });
     setIsCollectOpen(false);
     setActiveSubTab('history');
+    setSmsFeedback('');
+
+    const recipient = formatBangladeshMobile(studentForSms.contact);
+    if (!recipient) {
+      setSmsFeedback('Payment was recorded, but no valid Bangladesh guardian phone number is saved for this student.');
+      return;
+    }
+    const monthIndex = MONTHS.indexOf(payment.month);
+    const due = Math.max(0, payment.totalPayable - payment.amountPaid);
+    const smsText = [
+      `শিক্ষার্থী: ${payment.studentName}`,
+      `শ্রেণি: ${payment.class} | রোল: ${studentForSms.roll || '—'}`,
+      `মাস: ${BENGALI_MONTHS[monthIndex] || payment.month}`,
+      `মোট প্রদেয়: ৳${payment.totalPayable.toLocaleString('bn-BD')}`,
+      `জমা: ৳${payment.amountPaid.toLocaleString('bn-BD')}`,
+      `বকেয়া: ৳${due.toLocaleString('bn-BD')}`,
+      'সামদানিয়া তালিমূল ইসলাম মাদ্রাসার পক্ষ থেকে ধন্যবাদ।',
+    ].join('\n');
+    try {
+      const result = await sendSchoolSms(SMS_API_URL, [recipient], smsText);
+      setSmsFeedback(`Payment recorded and SMS submitted (request ${result.requestId}).`);
+    } catch (error) {
+      setSmsFeedback(`Payment was recorded, but SMS could not be sent: ${error instanceof Error ? error.message : 'Unknown SMS error'}`);
+    }
+  };
+
+  const sendAbsenceSms = async (item: StudentAttendanceRecord['statuses'][number], date: string, className: string) => {
+    const student = students.find((entry) => entry.id === item.studentId);
+    const recipient = student ? formatBangladeshMobile(student.contact) : null;
+    if (!recipient) {
+      setSmsFeedback(`Could not send absence SMS: no valid guardian phone is saved for ${item.studentName}.`);
+      return;
+    }
+    if (!window.confirm(`Send an absence SMS to the guardian of ${item.studentName}?`)) return;
+    setSendingAbsenceSmsId(item.id);
+    setSmsFeedback('');
+    try {
+      const smsText = `প্রিয় অভিভাবক, আপনার সন্তান ${item.studentName}, রোল ${student.roll || '—'}, শ্রেণি ${className}, তারিখ ${date}-এ মাদ্রাসায় অনুপস্থিত ছিল। সামদানিয়া তালিমূল ইসলাম মাদ্রাসার পক্ষ থেকে জানানো হচ্ছে।`;
+      const result = await sendSchoolSms(SMS_API_URL, [recipient], smsText);
+      setSmsFeedback(`Absence SMS submitted for ${item.studentName} (request ${result.requestId}).`);
+    } catch (error) {
+      setSmsFeedback(`Absence SMS could not be sent: ${error instanceof Error ? error.message : 'Unknown SMS error'}`);
+    } finally {
+      setSendingAbsenceSmsId('');
+    }
   };
 
   // Dynamic list of all available classes (from settings + students)
@@ -538,6 +589,11 @@ export default function FeesModule({
             </button>
           )}
       </div>
+      {smsFeedback && (
+        <p className={`rounded-lg border px-4 py-3 text-xs ${smsFeedback.includes('could not') || smsFeedback.includes('no valid') ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`} role="status">
+          {smsFeedback}
+        </p>
+      )}
 
       {/* Nested Sub-Tabs Navigation */}
       <div className="border-b border-stone-100 flex flex-wrap gap-2">
@@ -1304,7 +1360,19 @@ export default function FeesModule({
                                     {item.uniform && <span className="rounded-full bg-violet-100 text-violet-700 px-1.5 py-0.5 text-[10px] font-bold">Uniform</span>}
                                   </>
                                 ) : (
-                                  <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-bold">অনুপস্থিত</span>
+                                  <>
+                                    <span className="rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-[10px] font-bold">অনুপস্থিত</span>
+                                    {!readOnly && (
+                                      <button
+                                        type="button"
+                                        disabled={sendingAbsenceSmsId === item.id}
+                                        onClick={() => void sendAbsenceSms(item, rec.date, rec.className)}
+                                        className="rounded-md border border-amber-300 bg-white px-2 py-1 text-[10px] font-bold text-amber-800 disabled:opacity-50"
+                                      >
+                                        {sendingAbsenceSmsId === item.id ? 'পাঠানো হচ্ছে…' : 'SMS পাঠান'}
+                                      </button>
+                                    )}
+                                  </>
                                 )}
                               </div>
                             </div>

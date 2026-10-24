@@ -4,6 +4,7 @@ import { TeacherAvatar, PhotoLightbox } from './TeacherPhoto';
 import AttendanceReportTab from './AttendanceReportTab';
 import PasswordConfirmModal from './PasswordConfirmModal';
 import { parseNumberWithBengaliSupport } from '../lib/digitUtils';
+import { BENGALI_MONTHS, formatBangladeshMobile, sendSchoolSms } from '../lib/sms';
 import { 
   Briefcase, 
   Plus, 
@@ -36,6 +37,7 @@ import {
 const isNonTeachingPortalAccount = (account: TeacherAccount): boolean =>
   /\b(staff|driver|cleaner|guard|security|accountant|cook|caretaker|peon|janitor|maintenance|office)\b/i
     .test(`${account.role || ''} ${account.designation || ''}`);
+const SMS_API_URL = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3015';
 
 interface SalariesModuleProps {
   teachersStaff: TeacherStaff[];
@@ -273,6 +275,7 @@ function SalariesModuleContent({
   }, [activeTab, onRefreshTeacherLeaves]);
 
   const [selectedStaff, setSelectedStaff] = useState<TeacherStaff | null>(null);
+  const [sendingSalarySms, setSendingSalarySms] = useState(false);
   const [disburseData, setDisburseData] = useState({
     month: MONTHS[new Date().getMonth()],
     year: new Date().getFullYear(),
@@ -326,7 +329,7 @@ function SalariesModuleContent({
     return { totalDue, totalDisbursed, totalRemaining, staffCount: teachersStaff.length };
   }, [teachersStaff, staffMonthStatus]);
 
-  const handleDisburseSubmit = () => {
+  const handleDisburseSubmit = async () => {
     if (!selectedStaff) return;
 
     const { totalDisbursed } = getMonthStatus(selectedStaff.id, disburseData.month, disburseData.year);
@@ -346,7 +349,35 @@ function SalariesModuleContent({
       paymentMode: disburseData.method
     });
 
-    alert(`Disbursed ৳${sendAmount.toLocaleString()} to ${selectedStaff.name} for ${disburseData.month} ${disburseData.year}.`);
+    let resultMessage = `Disbursed ৳${sendAmount.toLocaleString()} to ${selectedStaff.name} for ${disburseData.month} ${disburseData.year}.`;
+    const linkedTeacher = teacherAccounts.find((account) =>
+      (selectedStaff.email && account.email.toLowerCase() === selectedStaff.email.toLowerCase()) ||
+      account.fullName.toLowerCase() === selectedStaff.name.toLowerCase()
+    );
+    const recipient = formatBangladeshMobile(selectedStaff.contact || linkedTeacher?.contact || '');
+    if (recipient) {
+      setSendingSalarySms(true);
+      try {
+        const monthIndex = MONTHS.indexOf(disburseData.month);
+        const smsText = [
+          `শিক্ষক: ${selectedStaff.name}`,
+          `মাস: ${BENGALI_MONTHS[monthIndex] || disburseData.month} ${disburseData.year.toLocaleString('bn-BD')}`,
+          `মোট বেতন: ৳${selectedStaff.baseSalary.toLocaleString('bn-BD')}`,
+          `পরিশোধ: ৳${sendAmount.toLocaleString('bn-BD')}`,
+          `বকেয়া: ৳${Math.max(0, selectedStaff.baseSalary - totalDisbursed - sendAmount).toLocaleString('bn-BD')}`,
+          'সামদানিয়া তালিমূল ইসলাম মাদ্রাসা।',
+        ].join('\n');
+        const sms = await sendSchoolSms(SMS_API_URL, [recipient], smsText);
+        resultMessage += ` SMS submitted (request ${sms.requestId}).`;
+      } catch (error) {
+        resultMessage += ` Salary was recorded, but SMS could not be sent: ${error instanceof Error ? error.message : 'Unknown SMS error'}`;
+      } finally {
+        setSendingSalarySms(false);
+      }
+    } else {
+      resultMessage += ' Salary was recorded, but no valid Bangladesh phone number is saved for this teacher.';
+    }
+    alert(resultMessage);
     
     setSelectedStaff(null);
     setDisburseData({
@@ -1338,7 +1369,7 @@ function SalariesModuleContent({
                 <button
                   type="button"
                   onClick={handleDisburseSubmit}
-                  disabled={!disburseData.method}
+                  disabled={!disburseData.method || sendingSalarySms}
                   className="bg-[#4a5d4e] hover:bg-[#3d4d41] disabled:bg-[#6a7d6e] text-white text-xs font-bold px-6 py-2.5 rounded-lg shadow-sm active:scale-95 cursor-pointer border border-[#3d4d41] flex items-center gap-1.5"
                 >
                   <Send className="h-3.5 w-3.5" />

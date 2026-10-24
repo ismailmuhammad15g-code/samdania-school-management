@@ -1,6 +1,16 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+.app-loading-skeleton .animate-pulse {
+  animation-duration: 1s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-skeleton .animate-pulse {
+    animation: none;
+  }
+}
+
 @font-face {
   font-family: 'SolaimanLipi';
   src: url('./assets/font/SolaimanLipi.ttf') format('truetype');
