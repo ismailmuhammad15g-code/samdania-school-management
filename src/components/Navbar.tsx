@@ -24,7 +24,8 @@ import {
   Globe2,
   Megaphone,
   FileWarning,
-  ArrowRightLeft
+  ArrowRightLeft,
+  QrCode
 } from 'lucide-react';
 import NotificationBell from './NotificationBell';
 
@@ -52,6 +53,7 @@ const MORE_ITEMS = [
   { id: 'assistant', label: 'Assistant', description: 'Madrasah management assistant', icon: Bot },
   { id: 'appManagement', label: 'App Management', description: 'Notices and app administration', icon: Megaphone },
   { id: 'mainMadrasah', label: 'Main Madrasah', description: 'Official website management', icon: Globe2 },
+  { id: 'appQr', label: 'App Download QR', description: 'QR code for the official mobile app', icon: QrCode },
   { id: 'missingFillouts', label: 'Missing Fillouts', description: 'Incomplete student information', icon: FileWarning },
   { id: 'summary', label: 'Student Summary', description: 'Profile & Results (সারসংক্ষেপ)', icon: ClipboardList },
   { id: 'pending', label: 'Pending (অপেক্ষমাণ)', description: 'Teacher resignations & requests', icon: ClipboardList },

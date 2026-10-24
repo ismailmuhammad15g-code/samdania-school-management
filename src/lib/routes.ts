@@ -19,6 +19,7 @@ export type AppTab =
   | 'assistant'
   | 'appManagement'
   | 'mainMadrasah'
+  | 'appQr'
   | 'missingFillouts';
 
 export const TAB_PATHS: Record<AppTab, string> = {
@@ -38,6 +39,7 @@ export const TAB_PATHS: Record<AppTab, string> = {
   assistant: '/assistant',
   appManagement: '/app-management',
   mainMadrasah: '/main-madrasah',
+  appQr: '/app-qr',
   missingFillouts: '/missing-fillouts',
 };
 

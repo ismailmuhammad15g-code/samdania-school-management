@@ -63,6 +63,7 @@ import MainMadrasahPage from './components/MainMadrasahPage';
 import AppManagementPage from './components/AppManagementPage';
 import MissingFilloutsPage from './components/MissingFilloutsPage';
 import StudentPromotionModule from './components/StudentPromotionModule';
+import AppDownloadQrPage from './components/AppDownloadQrPage';
 import { tabToPath, pathToTab, type AppTab } from './lib/routes';
 import type { AgentActions } from './lib/aiTools';
 import { isStudentActive } from './lib/studentEnrollment';
@@ -1798,6 +1799,8 @@ export default function App() {
         {activeTab === 'mainMadrasah' && (
           <MainMadrasahPage readOnly={adminReadOnly} teacherAccounts={teacherAccounts} />
         )}
+
+        {activeTab === 'appQr' && <AppDownloadQrPage />}
 
         {activeTab === 'missingFillouts' && (
           <MissingFilloutsPage
