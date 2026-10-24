@@ -492,12 +492,13 @@ export default function FeesModule({
     const due = Math.max(0, payment.totalPayable - payment.amountPaid);
     const smsText = [
       `শিক্ষার্থী: ${payment.studentName}`,
-      `শ্রেণি: ${payment.class} | রোল: ${studentForSms.roll || '—'}`,
+      `শ্রেণি: ${payment.class}`,
+      ...(studentForSms.roll ? [`রোল: ${studentForSms.roll}`] : []),
       `মাস: ${BENGALI_MONTHS[monthIndex] || payment.month}`,
       `মোট প্রদেয়: ৳${payment.totalPayable.toLocaleString('bn-BD')}`,
       `জমা: ৳${payment.amountPaid.toLocaleString('bn-BD')}`,
       `বকেয়া: ৳${due.toLocaleString('bn-BD')}`,
-      'সামদানিয়া তালিমূল ইসলাম মাদ্রাসার পক্ষ থেকে ধন্যবাদ।',
+      'সামদানিয়া তালিমূল ইসলাম মাদ্রাসার পক্ষ থেকে ধন্যবাদ',
     ].join('\n');
     try {
       const result = await sendSchoolSms(SMS_API_URL, [recipient], smsText);
