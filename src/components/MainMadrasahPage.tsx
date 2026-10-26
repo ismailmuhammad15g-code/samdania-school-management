@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } fr
 import type { Session } from '@supabase/supabase-js';
 import { ImagePlus, RefreshCw, ShieldCheck, Trash2, Upload, X } from 'lucide-react';
 import { getAuthClient, hasWebsiteAdminAccess } from '../lib/auth';
+import { getMainMadrasahApiUrl } from '../lib/sms';
 import type { TeacherAccount } from '../types';
 import MainMadrasahTeachers from './MainMadrasahTeachers';
 
@@ -45,7 +46,7 @@ const EMPTY_CONTENT: SiteContent = {
 };
 
 const STATUSES: AdmissionRequest['status'][] = ['new', 'reviewed', 'contacted', 'closed'];
-const API_DEFAULT = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3018';
+const API_DEFAULT = getMainMadrasahApiUrl();
 const SUPABASE_PROJECT_REF = import.meta.env.VITE_SUPABASE_URL?.match(/^https?:\/\/([^.]+)/i)?.[1] ?? 'unknown';
 
 interface MainMadrasahPageProps {

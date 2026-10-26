@@ -6,7 +6,7 @@ import PasswordConfirmModal from './PasswordConfirmModal';
 import { parseNumberWithBengaliSupport, normalizeForComparison, isClassMatch } from '../lib/digitUtils';
 import { useLiveStudentSearch } from '../lib/useLiveStudentSearch';
 import { uploadStudentPhoto } from '../lib/imgbb';
-import { BENGALI_MONTHS, formatBangladeshMobile, sendSchoolSms } from '../lib/sms';
+import { BENGALI_MONTHS, formatBangladeshMobile, getMainMadrasahApiUrl, sendSchoolSms } from '../lib/sms';
 import logo2 from '../assets/images/logo2.png';
 import { 
   Users, 
@@ -39,7 +39,7 @@ const feeNum = (v: unknown): number => {
   const n = parseNumberWithBengaliSupport(v);
   return Number.isFinite(n) ? n : 0;
 };
-const SMS_API_URL = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3018';
+const SMS_API_URL = getMainMadrasahApiUrl();
 
 interface FeesModuleProps {
   students: Student[];

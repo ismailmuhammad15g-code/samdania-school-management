@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Bell, Megaphone, Plus, Send, Trash2 } from 'lucide-react';
 import { dbGet, dbSet, onDbChange } from '../lib/localDb';
 import { Student } from '../types';
-import { formatBangladeshMobile, getSchoolSmsStatus, sendSchoolSms, type SmsProviderStatus } from '../lib/sms';
+import { formatBangladeshMobile, getMainMadrasahApiUrl, getSchoolSmsStatus, sendSchoolSms, type SmsProviderStatus } from '../lib/sms';
 import { getTeacherNotices, saveTeacherNotices, type TeacherNotice } from '../lib/teacherNotices';
 import { TeacherAccount } from '../types';
 import { getStaffNotices, saveStaffNotices, type StaffNotice } from '../lib/staffNotices';
@@ -22,7 +22,7 @@ type Notice = {
 };
 
 const NOTIFICATIONS_KEY = 'samdani_notifications';
-const SMS_API_URL = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3018';
+const SMS_API_URL = getMainMadrasahApiUrl();
 
 function readNotices(): Notice[] {
   const value = dbGet(NOTIFICATIONS_KEY);

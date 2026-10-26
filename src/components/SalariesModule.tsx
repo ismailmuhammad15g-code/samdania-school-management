@@ -5,7 +5,7 @@ import AttendanceReportTab from './AttendanceReportTab';
 import PasswordConfirmModal from './PasswordConfirmModal';
 import { parseNumberWithBengaliSupport } from '../lib/digitUtils';
 import { getSalaryBalance } from '../lib/salary';
-import { BENGALI_MONTHS, formatBangladeshMobile, sendSchoolSms } from '../lib/sms';
+import { BENGALI_MONTHS, formatBangladeshMobile, getMainMadrasahApiUrl, sendSchoolSms } from '../lib/sms';
 import { 
   Briefcase, 
   Plus, 
@@ -38,7 +38,7 @@ import {
 const isNonTeachingPortalAccount = (account: TeacherAccount): boolean =>
   /\b(staff|driver|cleaner|guard|security|accountant|cook|caretaker|peon|janitor|maintenance|office)\b/i
     .test(`${account.role || ''} ${account.designation || ''}`);
-const SMS_API_URL = import.meta.env.VITE_MAIN_MADRASAH_API_URL || 'http://localhost:3018';
+const SMS_API_URL = getMainMadrasahApiUrl();
 
 interface SalariesModuleProps {
   teachersStaff: TeacherStaff[];

@@ -1,5 +1,22 @@
 import { getAuthClient } from './auth';
 
+export function getMainMadrasahApiUrl(): string {
+  const configuredUrl = import.meta.env.VITE_MAIN_MADRASAH_API_URL?.trim();
+  if (configuredUrl) {
+    try {
+      const parsedUrl = new URL(configuredUrl);
+      const hostname = parsedUrl.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+      const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' ||
+        hostname === '::1' || hostname.endsWith('.localhost');
+      if (import.meta.env.PROD && (isLocalHost || parsedUrl.protocol !== 'https:')) return '';
+    } catch {
+      return '';
+    }
+    return configuredUrl;
+  }
+  return import.meta.env.DEV ? 'http://localhost:3018' : '';
+}
+
 export type SmsSubmission = {
   requestId: string | number;
   recipientCount: number;
@@ -23,17 +40,28 @@ async function getAdminAccessToken(): Promise<string> {
   return data.session.access_token;
 }
 
+async function fetchSmsApi(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
+    throw new Error('Could not reach the website SMS API. Check VITE_MAIN_MADRASAH_API_URL, confirm the website API is online, and rebuild/redeploy the school software.');
+  }
+}
+
 export async function sendSchoolSms(
   apiUrl: string,
   recipients: string[],
   message: string,
 ): Promise<SmsSubmission> {
   const base = apiUrl.trim().replace(/\/+$/, '');
-  if (!base) throw new Error('The school website API address is not configured for SMS.');
+  if (!base) {
+    throw new Error('SMS is not configured: set VITE_MAIN_MADRASAH_API_URL to the deployed website HTTPS address, then rebuild and redeploy the school software.');
+  }
 
   const accessToken = await getAdminAccessToken();
 
-  const response = await fetch(`${base}/api/admin/sms`, {
+  const response = await fetchSmsApi(`${base}/api/admin/sms`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -59,12 +87,14 @@ export async function getSchoolSmsStatus(
   requestId?: string | number,
 ): Promise<SmsProviderStatus> {
   const base = apiUrl.trim().replace(/\/+$/, '');
-  if (!base) throw new Error('The school website API address is not configured for SMS.');
+  if (!base) {
+    throw new Error('SMS is not configured: set VITE_MAIN_MADRASAH_API_URL to the deployed website HTTPS address, then rebuild and redeploy the school software.');
+  }
   const accessToken = await getAdminAccessToken();
   const query = requestId === undefined
     ? '?operation=balance'
     : `?request_id=${encodeURIComponent(String(requestId))}`;
-  const response = await fetch(`${base}/api/admin/sms${query}`, {
+  const response = await fetchSmsApi(`${base}/api/admin/sms${query}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: 'no-store',
   });
