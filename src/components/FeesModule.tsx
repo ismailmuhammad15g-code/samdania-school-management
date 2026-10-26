@@ -41,6 +41,16 @@ const feeNum = (v: unknown): number => {
 };
 const SMS_API_URL = getMainMadrasahApiUrl();
 
+const formatFeeSmsClass = (className: string): string => ({
+  'প্রথম': '১ম',
+  'দ্বিতীয়': '২য়',
+  'দ্বিতীয়': '২য়',
+  'তৃতীয়': '৩য়',
+  'তৃতীয়': '৩য়',
+  'চতুর্থ': '৪র্থ',
+  'পঞ্চম': '৫ম',
+}[className.trim()] || className.trim());
+
 interface FeesModuleProps {
   students: Student[];
   payments: FeePayment[];
@@ -510,16 +520,19 @@ export default function FeesModule({
       return;
     }
     const monthIndex = MONTHS.indexOf(payment.month);
+    const paymentDate = new Date(`${payment.date}T00:00:00`);
     const due = Math.max(0, payment.totalPayable - payment.amountPaid);
+    const className = formatFeeSmsClass(payment.class);
+    const roll = studentForSms.roll.replace(/\d/g, (digit) => '০১২৩৪৫৬৭৮৯'[Number(digit)]);
     const smsText = [
-      `শিক্ষার্থী: ${payment.studentName}`,
-      `শ্রেণি: ${payment.class}`,
-      ...(studentForSms.roll ? [`রোল: ${studentForSms.roll}`] : []),
-      `মাস: ${BENGALI_MONTHS[monthIndex] || payment.month}`,
-      `মোট প্রদেয়: ৳${payment.totalPayable.toLocaleString('bn-BD')}`,
-      `জমা: ৳${payment.amountPaid.toLocaleString('bn-BD')}`,
-      `বকেয়া: ৳${due.toLocaleString('bn-BD')}`,
-      'সামদানিয়া তালিমূল ইসলাম মাদ্রাসার পক্ষ থেকে ধন্যবাদ',
+      payment.studentName,
+      `${className}${roll ? `-${roll}` : ''}`,
+      `${BENGALI_MONTHS[monthIndex] || payment.month}-${paymentDate.getFullYear().toLocaleString('bn-BD')}`,
+      `মোট-${payment.totalPayable.toLocaleString('bn-BD')}`,
+      `জমা-${payment.amountPaid.toLocaleString('bn-BD')}`,
+      `বকেয়া-${due.toLocaleString('bn-BD')}`,
+      'সামদানিয়া তালিমুল ইসলাম',
+      'মাদ্রাসার পক্ষ থেকে ধন্যবাদ',
     ].join('\n');
     try {
       const result = await sendSchoolSms(SMS_API_URL, [recipient], smsText);
