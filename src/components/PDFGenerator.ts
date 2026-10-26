@@ -501,10 +501,10 @@ export const generateFeeReceiptPDF = async (
     
     #invoice-root table { width: 100%; border-collapse: collapse; margin-top: 10px; }
     #invoice-root th, #invoice-root td { border: 1px solid #d7c7a9; padding: 6px 10px; }
-    #invoice-root th { background: #ebe3d2; font-size: 14px; font-weight: 700; }
+    #invoice-root th { background: #ffffff; font-size: 14px; font-weight: 700; }
     
     #invoice-root .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-    #invoice-root .card { border: 1px solid #e2d4b5; border-radius: 8px; padding: 10px; background: #fbf8f3; }
+    #invoice-root .card { border: 1px solid #e2d4b5; border-radius: 8px; padding: 10px; background: #ffffff; }
     
     /* The cut line is the top edge of the bottom half → exactly 50vh. */
     #invoice-root .cutline { position: absolute; left: 0; right: 0; top: -1px; border-top: 1px dashed #999999; margin: 0; }
@@ -874,7 +874,7 @@ export const generateLoanReceiptPDF = async (
     .small { font-size: 14px; color: #555555; line-height: 1.3; }
     .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; }
     .kv { font-size: 14px; color: #444444; margin: 0; }
-    .card { border: 1px solid #e2d4b5; border-radius: 8px; padding: 10px; background: #fbf8f3; }
+    .card { border: 1px solid #e2d4b5; border-radius: 8px; padding: 10px; background: #ffffff; }
     .cutline { width: 100%; border-top: 1px dashed #999999; margin-top: 16px; margin-bottom: 8px; position: relative; }
     .cutline span { position: absolute; top: -9px; left: 15px; background: #ffffff; padding: 0 8px; font-size: 12px; color: #666666; }
     .footer-note { font-size: 12px; color: #6b6b6b; margin-top: auto; text-align: center; }
