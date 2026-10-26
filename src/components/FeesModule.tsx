@@ -1226,8 +1226,8 @@ export default function FeesModule({
                                 const btn = e.currentTarget as HTMLButtonElement;
                                 btn.disabled = true;
                                 try {
-                                  const roll = students.find((s) => s.id === p.studentId)?.roll;
-                                  await generateFeeReceiptPDF(p, { download: true, studentRoll: roll });
+                                  const student = students.find((s) => s.id === p.studentId);
+                                  await generateFeeReceiptPDF(p, { download: true, studentRoll: student?.roll, digitInputs: student?.digitInputs });
                                 } finally {
                                   btn.disabled = false;
                                 }
@@ -1242,8 +1242,8 @@ export default function FeesModule({
                                 const btn = e.currentTarget as HTMLButtonElement;
                                 btn.disabled = true;
                                 try {
-                                  const roll = students.find((s) => s.id === p.studentId)?.roll;
-                                  await generateFeeReceiptPDF(p, { download: false, print: true, studentRoll: roll });
+                                  const student = students.find((s) => s.id === p.studentId);
+                                  await generateFeeReceiptPDF(p, { download: false, print: true, studentRoll: student?.roll, digitInputs: student?.digitInputs });
                                 } finally {
                                   btn.disabled = false;
                                 }

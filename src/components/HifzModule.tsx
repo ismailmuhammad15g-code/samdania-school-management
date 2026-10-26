@@ -914,8 +914,8 @@ export default function HifzModule({
                                 const btn = e.currentTarget as HTMLButtonElement;
                                 btn.disabled = true;
                                 try {
-                                  const roll = students.find((s) => s.id === p.studentId)?.roll;
-                                  await generateFeeReceiptPDF(p, { download: true, school: 'hifz', studentRoll: roll });
+                                  const student = students.find((s) => s.id === p.studentId);
+                                  await generateFeeReceiptPDF(p, { download: true, school: 'hifz', studentRoll: student?.roll, digitInputs: student?.digitInputs });
                                 } finally {
                                   btn.disabled = false;
                                 }
@@ -930,8 +930,8 @@ export default function HifzModule({
                                 const btn = e.currentTarget as HTMLButtonElement;
                                 btn.disabled = true;
                                 try {
-                                  const roll = students.find((s) => s.id === p.studentId)?.roll;
-                                  await generateFeeReceiptPDF(p, { download: false, print: true, school: 'hifz', studentRoll: roll });
+                                  const student = students.find((s) => s.id === p.studentId);
+                                  await generateFeeReceiptPDF(p, { download: false, print: true, school: 'hifz', studentRoll: student?.roll, digitInputs: student?.digitInputs });
                                 } finally {
                                   btn.disabled = false;
                                 }

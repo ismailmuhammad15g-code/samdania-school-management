@@ -322,15 +322,16 @@ const printHtmlDirect = async (bodyHtml: string, opts: FastPrintOptions): Promis
 
 export const generateFeeReceiptPDF = async (
   payment: FeePayment,
-  options: { download?: boolean; print?: boolean; school?: 'fees' | 'hifz'; studentRoll?: string } = { download: true }
+  options: { download?: boolean; print?: boolean; school?: 'fees' | 'hifz'; studentRoll?: string; digitInputs?: FeeDigitInputs } = { download: true }
 ) => {
   // Letter Portrait Dimensions — the receipt fills the whole page
   const pageW = 215.9;   // mm
   const pageH = 279.4;   // mm
 
   const bnMonth = BENGALI_MONTHS[payment.month] || payment.month;
+  const digitInputs = { ...options.digitInputs, ...payment.digitInputs };
   const formatPaymentMoney = (amount: number, key: keyof FeeDigitInputs): string =>
-    formatFeeMoney(amount, payment.digitInputs?.[key]);
+    formatFeeMoney(amount, digitInputs[key] ?? digitInputs.amountPaid);
   
   const remaining = payment.totalPayable - payment.amountPaid;
   let remainingLabel: string;
