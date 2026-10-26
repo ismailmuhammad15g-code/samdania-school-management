@@ -10,11 +10,9 @@ This folder contains the Next.js public website and its API. It shares the exist
 
 The school software login uses `VITE_ADMIN_EMAIL`, `VITE_ADMIN_PASSWORD`, and `VITE_AUTH_SALT` from the root `.env`. After those credentials are accepted, the software silently attempts to sign into Supabase Auth with that same email and password. To enable website administration, create a Supabase Auth user once with those same credentials and grant it the admin app-metadata claim below. Staff still enter their credentials only once, at the normal software login. Do not expose admission data by weakening database policies. In local development, the website API runs on port 3018. For production builds, set `VITE_MAIN_MADRASAH_API_URL` to the deployed website's HTTPS origin in the school software's build environment, then rebuild and redeploy; the local `localhost:3018` default is used only during development.
 
-## SMS setup
+## SMS
 
-SMS is sent by the authenticated website API, never directly from the browser. Copy the SMS settings from `.env.example` into this folder's untracked `.env.local` and set `SMS_NET_BD_API_KEY` there. Keep the key server-only: do not add a `NEXT_PUBLIC_` or `VITE_` prefix, commit it, or place it in the school software's root `.env`. Configure `SMS_NET_BD_SENDER_ID` only if the provider has approved that sender ID. Sending to multiple recipients requires the approved campaign `SMS_NET_BD_CONTENT_ID`; single-recipient messages do not.
-
-Restart the website server after changing these values. Only authorized website administrators can submit SMS, check account balance, and view provider reports. Fee, absence, and salary SMS are triggered by the corresponding admin action; notice SMS is a separate delivery choice and requires confirmation because it may incur charges. The API validates and deduplicates Bangladesh mobile numbers, and displays provider failures without undoing an already-recorded fee or salary transaction.
+SMS is **not** part of this website. The school software sends it through its own same-origin `/api/sms` endpoint (see the root `.env.example` and `server/smsHandler.ts`), so this site does not need any SMS settings.
 
 ## Run locally
 

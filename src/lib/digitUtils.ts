@@ -65,6 +65,20 @@ export function normalizeForComparison(input: unknown): string {
   return convertBengaliToEnglish(str);
 }
 
+/**
+ * Normalizes a Bangladesh mobile number (Bengali/English digits, spaces, dashes,
+ * "+880" prefix) to the 880XXXXXXXXXX form SMS providers expect.
+ * Returns null when the value is not a valid Bangladesh mobile number.
+ * Shared by the browser and the SMS server function so both validate identically.
+ */
+export function formatBangladeshMobile(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const digits = convertBengaliToEnglish(value).replace(/\D/g, '');
+  if (/^01[3-9]\d{8}$/.test(digits)) return `880${digits.slice(1)}`;
+  if (/^8801[3-9]\d{8}$/.test(digits)) return digits;
+  return null;
+}
+
 /** Digits-only form of a value (after Bengali/Arabic digit conversion). */
 export function digitsOnly(input: unknown): string {
   return normalizeForComparison(input).replace(/\D+/g, '');

@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Bell, Megaphone, Plus, Send, Trash2 } from 'lucide-react';
 import { dbGet, dbSet, onDbChange } from '../lib/localDb';
 import { Student } from '../types';
-import { formatBangladeshMobile, getMainMadrasahApiUrl, getSchoolSmsStatus, sendSchoolSms, type SmsProviderStatus } from '../lib/sms';
+import { formatBangladeshMobile } from '../lib/digitUtils';
+import { getSchoolSmsStatus, sendSchoolSms, type SmsProviderStatus } from '../lib/sms';
 import { getTeacherNotices, saveTeacherNotices, type TeacherNotice } from '../lib/teacherNotices';
 import { TeacherAccount } from '../types';
 import { getStaffNotices, saveStaffNotices, type StaffNotice } from '../lib/staffNotices';
@@ -22,7 +23,6 @@ type Notice = {
 };
 
 const NOTIFICATIONS_KEY = 'samdani_notifications';
-const SMS_API_URL = getMainMadrasahApiUrl();
 
 function readNotices(): Notice[] {
   const value = dbGet(NOTIFICATIONS_KEY);
@@ -127,7 +127,6 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, s
     setMessage('');
     try {
       const sms = await sendSchoolSms(
-        SMS_API_URL,
         recipients,
         `${title.trim()}\n${content.trim()}\nসামদানিয়া তালিমূল ইসলাম মাদ্রাসা`,
       );
@@ -165,7 +164,7 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, s
     setSmsStatusLoading(true);
     setMessage('');
     try {
-      const status = await getSchoolSmsStatus(SMS_API_URL);
+      const status = await getSchoolSmsStatus();
       if (typeof status.balance !== 'string') throw new Error('The SMS provider did not return a balance.');
       setSmsBalance(status.balance);
     } catch (error) {
@@ -180,7 +179,7 @@ export default function AppManagementPage({ readOnly = false, teacherAccounts, s
     setSmsStatusLoading(true);
     setMessage('');
     try {
-      setSmsReport(await getSchoolSmsStatus(SMS_API_URL, lastSmsRequestId));
+      setSmsReport(await getSchoolSmsStatus(lastSmsRequestId));
     } catch (error) {
       setMessage(`SMS report could not be loaded: ${error instanceof Error ? error.message : 'Unknown SMS error'}`);
     } finally {
