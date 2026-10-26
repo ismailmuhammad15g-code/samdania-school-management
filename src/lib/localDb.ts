@@ -3,25 +3,26 @@
 // Data lives exclusively in the Supabase Postgres table `kv_store(key, value)`.
 // An in-memory cache provides fast synchronous reads during the current session.
 //
-// On every startup we:
-//   1. Wipe ALL `samdani_kv_*` keys from localStorage (kills any stale mirror).
-//   2. Pull the current state from Supabase into the in-memory cache.
-//
-// This means:
-//   • Deleting a row in Supabase SQL editor → immediately gone on all devices.
-//   • No more "localStorage re-upload" problem — local storage is never written.
-//   • Cross-device real-time sync still works via Supabase Realtime + BroadcastChannel.
+// Safety rules (this holds a school's money records, so they are strict):
+//   • NOTHING is ever written to Supabase until the full current state has been
+//     loaded from it. A failed/slow start-up can therefore never overwrite real
+//     records with an empty list. The app shows a "reconnecting" screen instead
+//     and keeps retrying by itself.
+//   • A change stays queued until Supabase confirms it; a failed save is retried
+//     and never replaces a newer edit with an older value.
+//   • Remote updates never overwrite a key that has local changes still waiting
+//     to be saved.
+//   • Nothing here deletes data on its own — only explicit dbDelete/dbWipeAll.
 //
 // Public API: dbGet / dbSet / dbDelete / dbExportAll / dbImportAll / dbWipeAll
 //             + initDatabase / isDbReady / onDbReady / onDbChange
+//             + getDbStatus / subscribeDbStatus / retryDbConnection
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseConfig, loadSupabaseConfig } from './supabaseConfig';
 
-let SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? '').replace(/\/+$/, '');
-let SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
 const TABLE = 'kv_store';
 
-// ── STEP 1: Wipe the stale localStorage mirror immediately (module load time) ──
-// This runs before any React code so the app never reads old local data.
+// ── Wipe any stale localStorage mirror from older versions (module load time) ──
 const LS_PREFIX = 'samdani_kv_';
 function wipeLocalStorageMirror(): void {
   try {
@@ -40,24 +41,12 @@ function wipeLocalStorageMirror(): void {
 }
 wipeLocalStorageMirror();
 
-// ── Config: build-time VITE_* wins; fall back to deployed /supabase-config.json ──
-export async function loadConfig(): Promise<void> {
-  if (SUPABASE_URL && SUPABASE_ANON) return;
-  try {
-    const res = await fetch('/supabase-config.json', { cache: 'no-store' });
-    if (!res.ok) return;
-    const c = await res.json();
-    SUPABASE_URL = SUPABASE_URL || (c.VITE_SUPABASE_URL ?? '').replace(/\/+$/, '');
-    SUPABASE_ANON = SUPABASE_ANON || c.VITE_SUPABASE_ANON_KEY || '';
-  } catch {
-    /* no deployed config */
-  }
-}
-
 let client: SupabaseClient | null = null;
 function getClient(): SupabaseClient {
   if (!client) {
-    client = createClient(SUPABASE_URL, SUPABASE_ANON, {
+    const config = getSupabaseConfig();
+    if (!config) throw new Error('Supabase is not configured.');
+    client = createClient(config.url, config.anonKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
@@ -69,19 +58,32 @@ function getClient(): SupabaseClient {
 }
 
 function enabled(): boolean {
-  return Boolean(SUPABASE_URL && SUPABASE_ANON);
+  return getSupabaseConfig() !== null;
 }
 
-async function pullAll(): Promise<{ data: Record<string, string>; keys: Set<string> }> {
-  const out: Record<string, string> = {};
-  const keys = new Set<string>();
+function describeError(error: unknown): string {
+  const e = error as { message?: string; status?: number; code?: string } | null;
+  const message = e?.message || String(error);
+  if (/failed to fetch|networkerror|load failed|network request failed|fetch failed/i.test(message)) {
+    return 'Cannot reach the database (Supabase). Check the internet connection.';
+  }
+  if (e?.status === 401 || e?.status === 403 || /permission denied|row-level security|jwt/i.test(message)) {
+    return `The database refused the request (${message}). Check the kv_store policy and the Supabase anon key.`;
+  }
+  if (/does not exist|relation/i.test(message)) {
+    return `Supabase table "${TABLE}" not found. Run SQLs/01_kv_store.sql in the Supabase SQL editor.`;
+  }
+  return message;
+}
+
+async function pullAll(): Promise<Record<string, string>> {
   const res = await getClient().from(TABLE).select('key, value');
   if (res.error) throw res.error;
+  const out: Record<string, string> = {};
   for (const row of (res.data as Array<{ key: string; value: string }>) || []) {
-    out[row.key] = row.value;
-    keys.add(row.key);
+    out[row.key] = typeof row.value === 'string' ? row.value : JSON.stringify(row.value);
   }
-  return { data: out, keys };
+  return out;
 }
 
 async function remoteSet(key: string, value: string): Promise<void> {
@@ -91,23 +93,69 @@ async function remoteSet(key: string, value: string): Promise<void> {
 
 async function remoteDelete(key: string): Promise<void> {
   const res = await getClient().from(TABLE).delete().eq('key', key);
-  if (res.error) {
-    if (/not found|0 rows/i.test(res.error.message || '')) return;
-    throw res.error;
-  }
+  if (res.error) throw res.error;
 }
 
 // ── In-memory cache (only source of truth during a session) ──
 const cache = new Map<string, any>();
 const cacheRaw = new Map<string, string>();
+// Changes not yet confirmed by Supabase. An entry is removed only after a
+// successful save of that exact value, so a failure can never lose or reorder edits.
 const dirty = new Map<string, string>();
 const removed = new Set<string>();
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
 let flushing = false;
+// Bumped by every local write/save. A remote read that started before a bump may be
+// older than what this device just saved, so it is discarded instead of applied.
+let mutationEpoch = 0;
 
+/** True only after the full remote state has been loaded — the gate for every write. */
 let online = false;
+/** True once the app may read the cache: loaded from Supabase, or running unconfigured. */
 let initialized = false;
+let realtimeStarted = false;
+let lastSyncAt = 0;
 const readyCallbacks: Array<() => void> = [];
+
+// ── Connection / save status (for the UI) ──
+export type DbState = 'connecting' | 'online' | 'offline' | 'unconfigured';
+export interface DbStatus {
+  state: DbState;
+  /** Changes made here that Supabase has not confirmed yet. */
+  unsaved: number;
+  /** Why loading failed (state "offline"). */
+  loadError: string | null;
+  /** Why the last save failed (state "online" with unsaved changes). */
+  saveError: string | null;
+}
+
+let state: DbState = 'connecting';
+let loadError: string | null = null;
+let saveError: string | null = null;
+let statusSnapshot: DbStatus = { state, unsaved: 0, loadError, saveError };
+const statusListeners = new Set<() => void>();
+
+function emitStatus(): void {
+  const unsaved = dirty.size + removed.size;
+  if (
+    statusSnapshot.state === state &&
+    statusSnapshot.unsaved === unsaved &&
+    statusSnapshot.loadError === loadError &&
+    statusSnapshot.saveError === saveError
+  ) return;
+  statusSnapshot = { state, unsaved, loadError, saveError };
+  statusListeners.forEach((listener) => listener());
+}
+
+export function getDbStatus(): DbStatus {
+  return statusSnapshot;
+}
+
+/** useSyncExternalStore-compatible subscription. */
+export function subscribeDbStatus(listener: () => void): () => void {
+  statusListeners.add(listener);
+  return () => { statusListeners.delete(listener); };
+}
 
 // ── Real-time change subscription ──
 const changeListeners: Array<(keys: string[]) => void> = [];
@@ -151,36 +199,12 @@ try {
   bc = null;
 }
 
-function broadcast(op: { t: 'set' | 'del' | 'import'; key?: string; raw?: string; all?: Record<string, string> }): void {
+type BcOp = { t: 'set' | 'del' | 'import'; key?: string; raw?: string; all?: Record<string, string> };
+
+function broadcast(op: BcOp): void {
   if (bc) {
     try { bc.postMessage(op); } catch { /* ignore */ }
   }
-}
-
-type BcOp = { t: 'set' | 'del' | 'import'; key?: string; raw?: string; all?: Record<string, string> };
-
-function applyExternal(key: string, raw: string): void {
-  if (cacheRaw.get(key) === raw) return; // identical — no-op
-  cache.set(key, deserialize(raw));
-  cacheRaw.set(key, raw);
-  // NOTE: we intentionally do NOT write to localStorage here
-  scheduleNotify(key);
-}
-
-if (bc) {
-  bc.addEventListener('message', (e: MessageEvent) => {
-    const op = e.data as BcOp | null;
-    if (!op) return;
-    if (op.t === 'set' && op.key != null && op.raw != null) {
-      applyExternal(op.key, op.raw);
-    } else if (op.t === 'del' && op.key != null) {
-      cache.delete(op.key);
-      cacheRaw.delete(op.key);
-      scheduleNotify(op.key);
-    } else if (op.t === 'import' && op.all) {
-      for (const [k, v] of Object.entries(op.all)) applyExternal(k, v);
-    }
-  });
 }
 
 function deserialize(raw: string | null): any {
@@ -188,63 +212,92 @@ function deserialize(raw: string | null): any {
   try { return JSON.parse(raw); } catch { return null; }
 }
 
-function scheduleFlush(): void {
-  if (flushTimer === null) flushTimer = setTimeout(() => void flush(), 500);
+// A remote/other-tab value never replaces a key that still has unsaved local changes.
+function applyExternal(key: string, raw: string): void {
+  if (dirty.has(key) || removed.has(key)) return;
+  if (cacheRaw.get(key) === raw) return; // identical — no-op
+  cache.set(key, deserialize(raw));
+  cacheRaw.set(key, raw);
+  scheduleNotify(key);
+}
+
+function applyExternalDelete(key: string): void {
+  if (dirty.has(key) || removed.has(key)) return;
+  if (!cache.has(key) && !cacheRaw.has(key)) return;
+  cache.delete(key);
+  cacheRaw.delete(key);
+  scheduleNotify(key);
+}
+
+if (bc) {
+  bc.addEventListener('message', (e: MessageEvent) => {
+    // Another tab's data is only trusted once this tab has loaded its own copy.
+    if (!initialized) return;
+    const op = e.data as BcOp | null;
+    if (!op) return;
+    if (op.t === 'set' && op.key != null && op.raw != null) {
+      applyExternal(op.key, op.raw);
+    } else if (op.t === 'del' && op.key != null) {
+      applyExternalDelete(op.key);
+    } else if (op.t === 'import' && op.all) {
+      for (const [k, v] of Object.entries(op.all)) applyExternal(k, v);
+    }
+  });
+}
+
+// ── Saving ──
+const RETRY_SAVE_MS = 10_000;
+
+function scheduleFlush(delay = 500): void {
+  if (flushTimer === null) flushTimer = setTimeout(() => void flush(), delay);
 }
 
 async function flush(): Promise<void> {
   flushTimer = null;
-  if (!online || flushing) {
-    if (flushing) scheduleFlush();
-    return;
-  }
+  if (!online) return; // never write before the full remote state has been loaded
+  if (flushing) { scheduleFlush(); return; }
   flushing = true;
+  let failure: string | null = null;
   try {
-    const toSet = [...dirty.entries()];
-    dirty.clear();
-    const toDelete = [...removed];
-    removed.clear();
-    for (const [key, value] of toSet) {
+    for (const [key, raw] of [...dirty]) {
       try {
-        await remoteSet(key, value);
-      } catch (e: any) {
-        dirty.set(key, value);
-        const status = e && e.status;
-        if (status === 401 || status === 403) online = false;
+        await remoteSet(key, raw);
+        mutationEpoch++;
+        // Keep the entry if the value changed while it was being sent; it is saved next round.
+        if (dirty.get(key) === raw) dirty.delete(key);
+      } catch (e) {
+        failure = describeError(e);
       }
     }
-    for (const key of toDelete) {
+    for (const key of [...removed]) {
       try {
         await remoteDelete(key);
-      } catch (e: any) {
-        const status = e && e.status;
-        if (status === 404) continue;
-        removed.add(key);
-        if (status === 401 || status === 403) online = false;
+        mutationEpoch++;
+        removed.delete(key);
+      } catch (e) {
+        failure = describeError(e);
       }
     }
-    if (online && dirty.size) setTimeout(scheduleFlush, 10000);
-  } catch {
-    setTimeout(scheduleFlush, 10000);
   } finally {
     flushing = false;
+    saveError = failure;
+    emitStatus();
   }
+  if (failure) scheduleFlush(RETRY_SAVE_MS);
+  else if (dirty.size || removed.size) scheduleFlush();
 }
 
 // ── Supabase Realtime (cross-device live sync) ──
 async function subscribeRealtime(): Promise<void> {
+  if (realtimeStarted) return;
+  realtimeStarted = true;
   try {
     const ch = getClient().channel('samdani_kv_sync');
     ch.on('postgres_changes', { event: '*', schema: 'public', table: TABLE }, (payload: any) => {
       try {
         if (payload.eventType === 'DELETE') {
           const k = payload.old?.key;
-          if (k != null) {
-            cache.delete(k);
-            cacheRaw.delete(k);
-            // No localStorage to delete from
-            scheduleNotify(k);
-          }
+          if (k != null) applyExternalDelete(k);
         } else {
           const k = payload.new?.key;
           const v = payload.new?.value;
@@ -256,84 +309,125 @@ async function subscribeRealtime(): Promise<void> {
     });
     await ch.subscribe();
   } catch (e) {
+    realtimeStarted = false;
     console.warn('[localDb] Realtime subscription failed (continuing without live sync).', e);
   }
 }
 
-export async function initDatabase(): Promise<void> {
-  if (initialized) return;
-  await loadConfig();
+// ── Loading ──
+let loading = false;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempt = 0;
 
-  // Always start with a clean in-memory cache.
-  // localStorage was already wiped at module load time above.
-  cache.clear();
-  cacheRaw.clear();
-
-  if (!enabled()) {
-    // No Supabase configured — run in-memory only (empty start every session).
-    console.warn('[localDb] No Supabase config found. Running in-memory only (data will not persist).');
-    online = false;
-    initialized = true;
-    readyCallbacks.forEach((cb) => cb());
-    return;
-  }
-
+/** Loads the complete remote state. Returns false (and keeps retrying) on any failure. */
+async function loadFromRemote(): Promise<boolean> {
+  if (loading) return false;
+  loading = true;
   try {
-    // ── ONE-TIME MIGRATION v3: wipe stale fee/loan/attendance test data from Supabase ──
-    // Runs once ever per Supabase project. Checks for a marker row; if absent,
-    // directly deletes the payment/loan/attendance rows from the remote table before loading,
-    // then writes the marker so this never runs again on any device.
-    const MIGRATION_KEY = 'samdani_migration_v3_cleared';
-    const [schemaCheck, markerRes] = await Promise.all([
-      getClient().from(TABLE).select('key', { count: 'exact', head: true }),
-      getClient().from(TABLE).select('key').eq('key', MIGRATION_KEY).maybeSingle(),
-    ]);
-    if (schemaCheck.error) {
-      const message = schemaCheck.error.message || '';
-      if (/does not exist|relation/i.test(message)) {
-        throw new Error(`Supabase table "${TABLE}" not found. Run SQLs/01_kv_store.sql in the Supabase SQL editor.`);
-      }
-      throw schemaCheck.error;
-    }
-    if (markerRes.error) throw markerRes.error;
+    const remote = await pullAll();
 
-    if (!markerRes.data) {
-      // Marker absent → first run after deploy. Wipe the stale rows.
-      const KEYS_TO_WIPE = [
-        'samdani_payments',
-        'samdani_invoice_counter',
-        'samdani_loans',
-        'samdani_loan_payments',
-        'samdani_attendance_records',
-        'samdani_student_attendance_records',
-        'samdani_attendance_qrset'
-      ];
-      const deleteResult = await getClient().from(TABLE).delete().in('key', KEYS_TO_WIPE);
-      if (deleteResult.error) throw deleteResult.error;
-      // Set the marker so migration never repeats.
-      const markerWrite = await getClient()
-        .from(TABLE)
-        .upsert({ key: MIGRATION_KEY, value: JSON.stringify(true) }, { onConflict: 'key' });
-      if (markerWrite.error) throw markerWrite.error;
-      console.log('[localDb] Migration v3: wiped stale fee, loan, and attendance data from Supabase.');
-    }
-
-    // STEP 2: Load ALL data exclusively from Supabase.
-    const { data: remoteRaw } = await pullAll();
-    for (const [k, v] of Object.entries(remoteRaw)) {
+    const touched = new Set<string>([...cache.keys(), ...Object.keys(remote)]);
+    cache.clear();
+    cacheRaw.clear();
+    for (const [k, v] of Object.entries(remote)) {
       cache.set(k, deserialize(v));
       cacheRaw.set(k, v);
     }
     online = true;
-    void subscribeRealtime();
-  } catch (e) {
-    console.warn('[localDb] Supabase unreachable; starting with empty in-memory state.', e);
-    online = false;
-  } finally {
+    lastSyncAt = Date.now();
+    reconnectAttempt = 0;
+    loadError = null;
+    state = 'online';
     initialized = true;
-    readyCallbacks.forEach((cb) => cb());
-    // No dirty keys to flush — we loaded from remote, not from local.
+    void subscribeRealtime();
+    emitStatus();
+    readyCallbacks.splice(0).forEach((cb) => cb());
+    notifyChanged([...touched]);
+    return true;
+  } catch (e) {
+    console.warn('[localDb] Could not load data from Supabase; will retry.', e);
+    loadError = describeError(e);
+    state = 'offline';
+    emitStatus();
+    return false;
+  } finally {
+    loading = false;
   }
+}
+
+function scheduleReconnect(): void {
+  if (online || reconnectTimer !== null) return;
+  const delay = Math.min(30_000, 2_000 * 2 ** reconnectAttempt++);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    void retryDbConnection();
+  }, delay);
+}
+
+/** Retry loading right now (used by the "Retry" button and when the network returns). */
+export async function retryDbConnection(): Promise<boolean> {
+  if (online || !enabled() || loading) return online;
+  if (reconnectTimer !== null) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  state = 'connecting';
+  emitStatus();
+  const ok = await loadFromRemote();
+  if (!ok) scheduleReconnect();
+  return ok;
+}
+
+/**
+ * Re-reads the remote state after the network or tab comes back, so edits made
+ * from this device after a long sleep are never based on stale data. Keys with
+ * unsaved local changes are left untouched.
+ */
+async function resyncFromRemote(): Promise<void> {
+  if (!online || loading || flushing) return;
+  loading = true;
+  try {
+    const epoch = mutationEpoch;
+    const remote = await pullAll();
+    if (epoch !== mutationEpoch) return; // something was saved meanwhile — this snapshot may be older
+    for (const [k, v] of Object.entries(remote)) applyExternal(k, v);
+    for (const k of [...cache.keys()]) {
+      if (!(k in remote)) applyExternalDelete(k);
+    }
+    lastSyncAt = Date.now();
+  } catch (e) {
+    console.warn('[localDb] Background re-sync failed; will try again later.', e);
+  } finally {
+    loading = false;
+  }
+}
+
+let initPromise: Promise<void> | null = null;
+
+/** Starts loading (idempotent — safe to call from React StrictMode's double effect). */
+export function initDatabase(): Promise<void> {
+  initPromise ??= startDatabase();
+  return initPromise;
+}
+
+async function startDatabase(): Promise<void> {
+  await loadSupabaseConfig();
+
+  // Always start with a clean in-memory cache.
+  cache.clear();
+  cacheRaw.clear();
+
+  if (!enabled()) {
+    // No Supabase configured — run in-memory only (data will not persist).
+    console.warn('[localDb] No Supabase config found. Running in-memory only (data will not persist).');
+    online = false;
+    state = 'unconfigured';
+    initialized = true;
+    emitStatus();
+    readyCallbacks.splice(0).forEach((cb) => cb());
+    return;
+  }
+
+  state = 'connecting';
+  emitStatus();
+  if (!(await loadFromRemote())) scheduleReconnect();
 }
 
 export function isDbReady(): boolean {
@@ -351,25 +445,24 @@ export function dbGet(key: string): any {
 }
 
 /**
- * Fetch ONE key fresh from Supabase (bypasses the in-memory cache for that
- * read), then update the cache + notify listeners. Used by live search so
- * directory results always reflect the remote store, not a stale snapshot.
+ * Fetch ONE key fresh from Supabase, then update the cache + notify listeners.
+ * Used by live search so results reflect the remote store, not a stale snapshot.
+ * Read-only: it never changes the connection state, and never replaces a key
+ * that has unsaved local changes.
  */
 export async function dbRefreshKey(key: string): Promise<any> {
-  if (!enabled()) return dbGet(key);
+  if (!online) return dbGet(key);
   try {
+    const epoch = mutationEpoch;
     const res = await getClient().from(TABLE).select('value').eq('key', key).maybeSingle();
     if (res.error) throw res.error;
+    if (epoch !== mutationEpoch) return dbGet(key); // saved meanwhile — the fetched copy may be older
     if (res.data == null || res.data.value == null) {
-      cache.delete(key);
-      cacheRaw.delete(key);
-      scheduleNotify(key);
-      return null;
+      applyExternalDelete(key);
+      return dbGet(key);
     }
-    const raw = typeof res.data.value === 'string' ? res.data.value : JSON.stringify(res.data.value);
-    applyExternal(key, raw);
-    online = true;
-    return cache.get(key) ?? null;
+    applyExternal(key, typeof res.data.value === 'string' ? res.data.value : JSON.stringify(res.data.value));
+    return dbGet(key);
   } catch (e) {
     console.warn('[localDb] dbRefreshKey failed; falling back to cache.', e);
     return dbGet(key);
@@ -380,13 +473,14 @@ export function dbSet(key: string, value: any): void {
   const raw = JSON.stringify(value);
   // Echo-loop guard: skip if value is unchanged.
   if (cacheRaw.get(key) === raw) return;
+  mutationEpoch++;
   cache.set(key, value);
   cacheRaw.set(key, raw);
-  // NOTE: intentionally NOT writing to localStorage
   if (online) {
     dirty.set(key, raw);
     removed.delete(key);
     scheduleFlush();
+    emitStatus();
   }
   broadcast({ t: 'set', key, raw });
   scheduleNotify(key);
@@ -394,13 +488,14 @@ export function dbSet(key: string, value: any): void {
 
 export function dbDelete(key: string): void {
   const had = cache.has(key) || cacheRaw.has(key);
+  mutationEpoch++;
   cache.delete(key);
   cacheRaw.delete(key);
-  // NOTE: intentionally NOT touching localStorage
   if (online) {
     removed.add(key);
     dirty.delete(key);
     scheduleFlush();
+    emitStatus();
   }
   broadcast({ t: 'del', key });
   if (had) scheduleNotify(key);
@@ -420,6 +515,7 @@ export function dbExportAll(): Record<string, any> {
  */
 export function dbWipeAll(): void {
   const keys = [...cache.keys()];
+  mutationEpoch++;
   cache.clear();
   cacheRaw.clear();
   // Also wipe any stale localStorage keys (belt-and-suspenders)
@@ -430,20 +526,20 @@ export function dbWipeAll(): void {
       dirty.delete(k);
     }
   }
-  if (online) scheduleFlush();
+  if (online) { scheduleFlush(); emitStatus(); }
   broadcast({ t: 'import', all: {} });
   notifyChanged(keys);
 }
 
 export function dbImportAll(data: Record<string, any>): void {
   const all: Record<string, string> = {};
+  mutationEpoch++;
   cache.clear();
   cacheRaw.clear();
   for (const [k, v] of Object.entries(data)) {
     const raw = JSON.stringify(v);
     cache.set(k, v);
     cacheRaw.set(k, raw);
-    // NOTE: intentionally NOT writing to localStorage
     all[k] = raw;
     if (online) {
       dirty.set(k, raw);
@@ -451,16 +547,39 @@ export function dbImportAll(data: Record<string, any>): void {
     }
   }
   removed.clear();
-  if (online) scheduleFlush();
+  if (online) { scheduleFlush(); emitStatus(); }
   broadcast({ t: 'import', all });
   notifyChanged(Object.keys(all));
 }
 
 if (typeof window !== 'undefined') {
-  const flushNow = () => void flush();
+  const flushNow = () => { if (online && (dirty.size || removed.size)) void flush(); };
   window.addEventListener('pagehide', flushNow);
-  window.addEventListener('beforeunload', flushNow);
+
+  // Closing the tab with changes Supabase has not confirmed would lose them — ask first.
+  window.addEventListener('beforeunload', (event) => {
+    flushNow();
+    if (dirty.size || removed.size) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  });
+
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flushNow();
+    if (document.visibilityState === 'hidden') {
+      flushNow();
+    } else if (!online) {
+      void retryDbConnection();
+    } else if (Date.now() - lastSyncAt > 60_000) {
+      void resyncFromRemote();
+    }
+  });
+
+  window.addEventListener('online', () => {
+    if (!online) void retryDbConnection();
+    else {
+      scheduleFlush(0);
+      void resyncFromRemote();
+    }
   });
 }

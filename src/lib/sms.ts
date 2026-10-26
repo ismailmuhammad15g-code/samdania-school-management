@@ -1,21 +1,10 @@
-import { getAuthClient } from './auth';
+import { getAuthClient, hasWebsiteAdminAccess } from './auth';
+import { loadSupabaseConfig } from './supabaseConfig';
 
-export function getMainMadrasahApiUrl(): string {
-  const configuredUrl = import.meta.env.VITE_MAIN_MADRASAH_API_URL?.trim();
-  if (configuredUrl) {
-    try {
-      const parsedUrl = new URL(configuredUrl);
-      const hostname = parsedUrl.hostname.replace(/^\[|\]$/g, '').toLowerCase();
-      const isLocalHost = hostname === 'localhost' || hostname === '127.0.0.1' ||
-        hostname === '::1' || hostname.endsWith('.localhost');
-      if (import.meta.env.PROD && (isLocalHost || parsedUrl.protocol !== 'https:')) return '';
-    } catch {
-      return '';
-    }
-    return configuredUrl;
-  }
-  return import.meta.env.DEV ? 'http://localhost:3018' : '';
-}
+// SMS goes through this app's own same-origin /api/sms endpoint (a Vercel Function in
+// production, the Vite dev server locally). The SMS provider key never reaches the browser.
+const SMS_ENDPOINT = '/api/sms';
+const REQUEST_TIMEOUT_MS = 30_000;
 
 export type SmsSubmission = {
   requestId: string | number;
@@ -31,87 +20,101 @@ export type SmsProviderStatus = {
   recipients?: Array<{ number: string; charge: string; status: string }>;
 };
 
-async function getAdminAccessToken(): Promise<string> {
-  const { data, error } = await getAuthClient().auth.getSession();
-  if (error) throw error;
-  if (!data.session?.access_token) {
-    throw new Error('Sign in again to use SMS from the school software.');
+const NOT_ADMIN_MESSAGE = 'This Supabase account is not authorized to send SMS. Set app_metadata "main_madrasah_admin": true for it in Supabase Auth, then sign out and sign in again.';
+
+async function getAdminAccessToken(forceRefresh: boolean): Promise<string> {
+  await loadSupabaseConfig();
+  const client = getAuthClient();
+
+  const read = async () => forceRefresh ? client.auth.refreshSession() : client.auth.getSession();
+  let { data, error } = await read();
+  if (!error && data.session && !hasWebsiteAdminAccess(data.session)) {
+    // The admin claim may have been granted after this session was issued.
+    ({ data, error } = await client.auth.refreshSession());
   }
+  if (error) {
+    throw new Error(/fetch|network|timeout/i.test(error.message)
+      ? 'Could not reach the login server (Supabase). Check the internet connection and try again.'
+      : error.message);
+  }
+  if (!data.session?.access_token) {
+    throw new Error('Sign out and sign in again to use SMS from the school software.');
+  }
+  if (!hasWebsiteAdminAccess(data.session)) throw new Error(NOT_ADMIN_MESSAGE);
   return data.session.access_token;
 }
 
-async function fetchSmsApi(url: string, init: RequestInit): Promise<Response> {
-  try {
-    return await fetch(url, init);
-  } catch (error) {
-    if (!(error instanceof TypeError)) throw error;
-    throw new Error('Could not reach the website SMS API. Check VITE_MAIN_MADRASAH_API_URL, confirm the website API is online, and rebuild/redeploy the school software.');
+function describeNetworkFailure(error: unknown): string {
+  if (error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
+    return 'The SMS server did not answer in time. The message may or may not have been sent — check the SMS.net.bd portal before sending again.';
   }
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return 'No internet connection. Reconnect and try again.';
+  }
+  return `Could not reach the SMS server (${SMS_ENDPOINT}). Make sure the software is running with its server part (npm run dev, or the Vercel deployment including the api folder) and try again.`;
 }
 
-export async function sendSchoolSms(
-  apiUrl: string,
-  recipients: string[],
-  message: string,
-): Promise<SmsSubmission> {
-  const base = apiUrl.trim().replace(/\/+$/, '');
-  if (!base) {
-    throw new Error('SMS is not configured: set VITE_MAIN_MADRASAH_API_URL to the deployed website HTTPS address, then rebuild and redeploy the school software.');
+async function requestSmsApi<T>(query: string, method: 'GET' | 'POST', payload?: unknown): Promise<T> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const accessToken = await getAdminAccessToken(attempt > 0);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let response: Response;
+    let text: string;
+    try {
+      response = await fetch(`${SMS_ENDPOINT}${query}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          ...(payload === undefined ? {} : { 'Content-Type': 'application/json' }),
+        },
+        body: payload === undefined ? undefined : JSON.stringify(payload),
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+      text = await response.text();
+    } catch (error) {
+      throw new Error(describeNetworkFailure(error));
+    } finally {
+      clearTimeout(timer);
+    }
+
+    // An expired token is rejected before anything is sent, so retrying once with a refreshed session cannot duplicate an SMS.
+    if (response.status === 401 && attempt === 0) continue;
+
+    let body: (Record<string, unknown> & { message?: string }) | null = null;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      /* not JSON — reported below */
+    }
+    if (!body || typeof body !== 'object') {
+      throw new Error(response.status === 404 || response.ok
+        ? `The SMS service was not found at ${SMS_ENDPOINT}. Deploy the api folder with the software (or run npm run dev) and try again.`
+        : `The SMS server returned an unexpected response (HTTP ${response.status}). Try again in a moment.`);
+    }
+    if (!response.ok) throw new Error(body.message || `SMS request failed (HTTP ${response.status}).`);
+    return body as T;
   }
+  throw new Error('Your login session has expired. Sign out and sign in again to use SMS.');
+}
 
-  const accessToken = await getAdminAccessToken();
-
-  const response = await fetchSmsApi(`${base}/api/admin/sms`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ recipients, message }),
-    cache: 'no-store',
-  });
-
-  const result = await response.json() as Partial<SmsSubmission> & { error?: number; msg?: string };
-  if (!response.ok) {
-    throw new Error(result.message || result.msg || `SMS request failed (${response.status}).`);
-  }
+export async function sendSchoolSms(recipients: string[], message: string): Promise<SmsSubmission> {
+  const result = await requestSmsApi<Partial<SmsSubmission>>('', 'POST', { recipients, message });
   if (result.requestId === undefined || typeof result.recipientCount !== 'number') {
     throw new Error('The SMS provider response was incomplete. Check the SMS request report before retrying.');
   }
-
   return result as SmsSubmission;
 }
 
-export async function getSchoolSmsStatus(
-  apiUrl: string,
-  requestId?: string | number,
-): Promise<SmsProviderStatus> {
-  const base = apiUrl.trim().replace(/\/+$/, '');
-  if (!base) {
-    throw new Error('SMS is not configured: set VITE_MAIN_MADRASAH_API_URL to the deployed website HTTPS address, then rebuild and redeploy the school software.');
-  }
-  const accessToken = await getAdminAccessToken();
+export async function getSchoolSmsStatus(requestId?: string | number): Promise<SmsProviderStatus> {
   const query = requestId === undefined
     ? '?operation=balance'
     : `?request_id=${encodeURIComponent(String(requestId))}`;
-  const response = await fetchSmsApi(`${base}/api/admin/sms${query}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    cache: 'no-store',
-  });
-  const result = await response.json() as { message?: string; data?: SmsProviderStatus | null };
-  if (!response.ok || !result.data) {
-    throw new Error(result.message || `SMS status request failed (${response.status}).`);
-  }
+  const result = await requestSmsApi<{ data?: SmsProviderStatus | null }>(query, 'GET');
+  if (!result.data) throw new Error('The SMS provider returned no data for this request.');
   return result.data;
-}
-
-export function formatBangladeshMobile(value: string): string | null {
-  const normalized = value.replace(/[০-৯]/g, (digit) => String('০১২৩৪৫৬৭৮৯'.indexOf(digit)))
-    .replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
-  const digits = normalized.replace(/[^\d]/g, '');
-  if (/^01[3-9]\d{8}$/.test(digits)) return `880${digits.slice(1)}`;
-  if (/^8801[3-9]\d{8}$/.test(digits)) return digits;
-  return null;
 }
 
 export const BENGALI_MONTHS = [
