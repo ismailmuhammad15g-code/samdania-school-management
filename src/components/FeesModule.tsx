@@ -288,14 +288,14 @@ export default function FeesModule({
     setPaymentFormData({
       date: new Date().toISOString().split('T')[0],
       month: MONTHS[new Date().getMonth()],
-      previousDue: student.previousDue.toString(),
-      currentMonthFee: student.currentMonthFee.toString(),
-      examFee: student.examFee.toString(),
-      transport: student.transport.toString(),
-      electricity: student.electricity.toString(),
-      water: student.water.toString(),
-      waiver: student.waiver.toString(),
-      advancePaid: student.advancePaid.toString(),
+      previousDue: student.digitInputs?.previousDue ?? student.previousDue.toString(),
+      currentMonthFee: student.digitInputs?.currentMonthFee ?? student.currentMonthFee.toString(),
+      examFee: student.digitInputs?.examFee ?? student.examFee.toString(),
+      transport: student.digitInputs?.transport ?? student.transport.toString(),
+      electricity: student.digitInputs?.electricity ?? student.electricity.toString(),
+      water: student.digitInputs?.water ?? student.water.toString(),
+      waiver: student.digitInputs?.waiver ?? student.waiver.toString(),
+      advancePaid: student.digitInputs?.advancePaid ?? student.advancePaid.toString(),
       receivedBy: '', // must be selected by user
       amountPaid: '', // default empty to fill
     });
@@ -341,14 +341,14 @@ export default function FeesModule({
       fatherName: student.fatherName || '',
       motherName: student.motherName || '',
       extraInfo: student.extraInfo || '',
-      previousDue: student.previousDue.toString(),
-      currentMonthFee: student.currentMonthFee.toString(),
-      examFee: student.examFee.toString(),
-      transport: student.transport.toString(),
-      electricity: student.electricity.toString(),
-      water: student.water.toString(),
-      waiver: student.waiver.toString(),
-      advancePaid: student.advancePaid.toString(),
+      previousDue: student.digitInputs?.previousDue ?? student.previousDue.toString(),
+      currentMonthFee: student.digitInputs?.currentMonthFee ?? student.currentMonthFee.toString(),
+      examFee: student.digitInputs?.examFee ?? student.examFee.toString(),
+      transport: student.digitInputs?.transport ?? student.transport.toString(),
+      electricity: student.digitInputs?.electricity ?? student.electricity.toString(),
+      water: student.digitInputs?.water ?? student.water.toString(),
+      waiver: student.digitInputs?.waiver ?? student.waiver.toString(),
+      advancePaid: student.digitInputs?.advancePaid ?? student.advancePaid.toString(),
     });
     setStudentPhotoUrl(student.photoUrl || student.photo_url || '');
     setStudentPhotoLink(student.photoUrl || student.photo_url || '');
@@ -407,6 +407,16 @@ export default function FeesModule({
       water: parseNumberWithBengaliSupport(studentFormData.water) || 0,
       waiver: parseNumberWithBengaliSupport(studentFormData.waiver) || 0,
       advancePaid: parseNumberWithBengaliSupport(studentFormData.advancePaid) || 0,
+      digitInputs: {
+        previousDue: studentFormData.previousDue,
+        currentMonthFee: studentFormData.currentMonthFee,
+        examFee: studentFormData.examFee,
+        transport: studentFormData.transport,
+        electricity: studentFormData.electricity,
+        water: studentFormData.water,
+        waiver: studentFormData.waiver,
+        advancePaid: studentFormData.advancePaid,
+      },
     };
 
     const currentEditingStudent = editingStudentId
@@ -459,6 +469,17 @@ export default function FeesModule({
       totalPayable: calculatedPayable,
       amountPaid: enteredCash,
       receivedBy: paymentFormData.receivedBy,
+      digitInputs: {
+        previousDue: paymentFormData.previousDue,
+        currentMonthFee: paymentFormData.currentMonthFee,
+        examFee: paymentFormData.examFee,
+        transport: paymentFormData.transport,
+        electricity: paymentFormData.electricity,
+        water: paymentFormData.water,
+        waiver: paymentFormData.waiver,
+        advancePaid: paymentFormData.advancePaid,
+        amountPaid: paymentFormData.amountPaid,
+      },
     };
     onCollectPayment(payment);
     const studentForSms = selectedStudent;

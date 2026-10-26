@@ -21,6 +21,11 @@ export interface LedgerTransaction {
   recordedBy: string;
 }
 
+export type FeeDigitInputs = Partial<Record<
+  'previousDue' | 'currentMonthFee' | 'examFee' | 'transport' | 'electricity' | 'water' | 'waiver' | 'advancePaid' | 'amountPaid',
+  string
+>>;
+
 export interface Student {
   id: string;
   name: string;
@@ -40,6 +45,7 @@ export interface Student {
   water: number;
   waiver: number;
   advancePaid: number;
+  digitInputs?: Omit<FeeDigitInputs, 'amountPaid'>;
   academicSession?: number;
   enrollmentStatus?: 'active' | 'left' | 'transferred';
   transferBranch?: string;
@@ -75,6 +81,7 @@ export interface FeePayment {
   amountPaid: number;
   receivedBy: string;
   recordedBy: string;
+  digitInputs?: FeeDigitInputs;
 }
 
 // --- SALARY MODULE TYPES ---

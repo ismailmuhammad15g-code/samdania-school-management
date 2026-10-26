@@ -1,9 +1,9 @@
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { LedgerTransaction, FeePayment, StudentAttendanceRecord, LoanRecord, LoanPayment, Student } from '../types';
+import { LedgerTransaction, FeePayment, FeeDigitInputs, StudentAttendanceRecord, LoanRecord, LoanPayment, Student } from '../types';
 import { BENGALI_FONT_BASE64 } from './BengaliFont';
-import { toBengaliDigits, numberToBengaliWords, formatTakaBengali } from '../lib/bengaliNumbers';
+import { numberToBengaliWords, formatTakaBengali } from '../lib/bengaliNumbers';
 import logoUrl from '../assets/images/logo2.png';
 import certSvgUrl from '../assets/images/Certificate Of samdania-madrasah.svg';
 
@@ -29,6 +29,32 @@ const escapeHtml = (s: string): string =>
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+
+const formatFeeMoney = (amount: number, input?: string): string => {
+  const formatted = amount.toFixed(2);
+  return `৳ ${input && /[০-৯]/.test(input) ? formatTakaBengali(amount) : formatted}`;
+};
+
+const applyFeeReceiptFontSize = (root: HTMLElement): void => {
+  const style = document.createElement('style');
+  style.textContent = `
+    #${root.id}.fee-receipt .summary-grid,
+    #${root.id}.fee-receipt .summary-grid *,
+    #${root.id}.fee-receipt .fee-table-box,
+    #${root.id}.fee-receipt .fee-table-box *,
+    #${root.id}.fee-receipt .calc-split,
+    #${root.id}.fee-receipt .calc-split *,
+    #${root.id}.fee-receipt .words-bar,
+    #${root.id}.fee-receipt .words-bar *,
+    #${root.id}.fee-receipt .received-by,
+    #${root.id}.fee-receipt .received-by *,
+    #${root.id}.fee-receipt #office-copy-section .card,
+    #${root.id}.fee-receipt #office-copy-section .card * {
+      font-size: 11pt !important;
+    }
+  `;
+  root.prepend(style);
+};
 
 const BENGALI_MONTHS: Record<string, string> = {
   'January': 'জানুয়ারি', 'February': 'ফেব্রুয়ারি', 'March': 'মার্চ',
@@ -156,6 +182,20 @@ const printHtmlDirect = async (bodyHtml: string, opts: FastPrintOptions): Promis
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+  #print-stage .fee-receipt .summary-grid,
+  #print-stage .fee-receipt .summary-grid *,
+  #print-stage .fee-receipt .fee-table-box,
+  #print-stage .fee-receipt .fee-table-box *,
+  #print-stage .fee-receipt .calc-split,
+  #print-stage .fee-receipt .calc-split *,
+  #print-stage .fee-receipt .words-bar,
+  #print-stage .fee-receipt .words-bar *,
+  #print-stage .fee-receipt .received-by,
+  #print-stage .fee-receipt .received-by *,
+  #print-stage .fee-receipt #office-copy-section .card,
+  #print-stage .fee-receipt #office-copy-section .card * {
+    font-size: 11pt !important;
   }
 </style>
 </head>
@@ -289,6 +329,8 @@ export const generateFeeReceiptPDF = async (
   const pageH = 279.4;   // mm
 
   const bnMonth = BENGALI_MONTHS[payment.month] || payment.month;
+  const formatPaymentMoney = (amount: number, key: keyof FeeDigitInputs): string =>
+    formatFeeMoney(amount, payment.digitInputs?.[key]);
   
   const remaining = payment.totalPayable - payment.amountPaid;
   let remainingLabel: string;
@@ -297,11 +339,11 @@ export const generateFeeReceiptPDF = async (
 
   if (remaining > 0) {
     remainingLabel = 'বকেয়া';
-    remainingValue = `৳ ${remaining.toFixed(2)}`;
+    remainingValue = formatPaymentMoney(remaining, 'amountPaid');
     remainingColor = '#aa3333';
   } else if (remaining < 0) {
     remainingLabel = 'অগ্রিম';
-    remainingValue = `৳ ${Math.abs(remaining).toFixed(2)}`;
+    remainingValue = formatPaymentMoney(Math.abs(remaining), 'amountPaid');
     remainingColor = '#227722';
   } else {
     remainingLabel = 'পরিশোধিত';
@@ -312,7 +354,7 @@ export const generateFeeReceiptPDF = async (
   // ── Values for the new boxy summary blocks ───────────────────────────────
   const dueAmount = remaining;                       // negative = advance
   const dueLabel = remaining < 0 ? 'অগ্রিম' : 'বকেয়া';
-  const dueValue = `৳ ${Math.abs(dueAmount).toFixed(2)}`;
+  const dueValue = formatPaymentMoney(Math.abs(dueAmount), 'amountPaid');
 
   // Left column of Block 2 — the message shown next to the calculation grid
   const leftColumnHtml =
@@ -320,25 +362,25 @@ export const generateFeeReceiptPDF = async (
       ? `<span style="font-size: 14px;">সম্পূর্ণ পরিশোধ করার জন্য আপনাকে</span>
          <h1>ধন্যবাদ</h1>`
       : remaining > 0
-        ? `<h1>আপনার বকেয়া: ৳ ${dueAmount.toFixed(2)}</h1>`
-        : `<h1>আপনার অগ্রিম: ৳ ${Math.abs(dueAmount).toFixed(2)}</h1>`;
+        ? `<h1>আপনার বকেয়া: ${formatPaymentMoney(dueAmount, 'amountPaid')}</h1>`
+        : `<h1>আপনার অগ্রিম: ${formatPaymentMoney(Math.abs(dueAmount), 'amountPaid')}</h1>`;
 
-  const tableRowsHtml = [
-    { num: '০১', label: 'পূর্ব বকেয়া', val: payment.previousDue, minus: false },
-    { num: '০২', label: 'বর্তমান মাস', val: payment.currentMonthFee, minus: false },
-    { num: '০৩', label: 'পরীক্ষার ফি', val: payment.examFee, minus: false },
-    { num: '০৪', label: 'গাড়ি ভাড়া', val: payment.transport, minus: false },
-    { num: '০৫', label: 'বিদ্যুৎ বিল', val: payment.electricity, minus: false },
-    { num: '০৬', label: 'পানি বিল', val: payment.water, minus: false },
-    { num: '০৭', label: 'মওকুফ', val: payment.waiver, minus: true },
-    { num: '০৮', label: 'অগ্রিম', val: payment.advancePaid, minus: true },
-  ]
+  const tableRowsHtml = ([
+    { num: '০১', label: 'পূর্ব বকেয়া', val: payment.previousDue, minus: false, key: 'previousDue' },
+    { num: '০২', label: 'বর্তমান মাস', val: payment.currentMonthFee, minus: false, key: 'currentMonthFee' },
+    { num: '০৩', label: 'পরীক্ষার ফি', val: payment.examFee, minus: false, key: 'examFee' },
+    { num: '০৪', label: 'গাড়ি ভাড়া', val: payment.transport, minus: false, key: 'transport' },
+    { num: '০৫', label: 'বিদ্যুৎ বিল', val: payment.electricity, minus: false, key: 'electricity' },
+    { num: '০৬', label: 'পানি বিল', val: payment.water, minus: false, key: 'water' },
+    { num: '০৭', label: 'মওকুফ', val: payment.waiver, minus: true, key: 'waiver' },
+    { num: '০৮', label: 'অগ্রিম', val: payment.advancePaid, minus: true, key: 'advancePaid' },
+  ] satisfies Array<{ num: string; label: string; val: number; minus: boolean; key: keyof FeeDigitInputs }>)
     // Only the heads that really carry an amount (the ones that get a ✔ tick)
     // are printed — unselected and zero-taka heads are left out completely.
     .filter((r) => Math.abs(Number(r.val) || 0) > 0.005)
     .map((r, i) => {
       const value = Number(r.val) || 0;
-      const amount = `${r.minus ? '- ' : ''}৳ ${Math.abs(value).toFixed(2)}`;
+      const amount = `${r.minus ? '- ' : ''}${formatPaymentMoney(Math.abs(value), r.key)}`;
       const color = '#1f2f26';
       const tick = '<span style="font-family:Arial,sans-serif;color:#1f7a3d;font-weight:bold;">✔</span>';
       const num = ['০১', '০২', '০৩', '০৪', '০৫', '০৬', '০৭', '০৮'][i] ?? r.num;
@@ -356,7 +398,7 @@ export const generateFeeReceiptPDF = async (
   // The layout is strict to 1123px width by 794px height (Exact A4 Landscape at 96 DPI)
   // Left side takes 50% (561.5px), Right side takes 50%
   const html = `
-<div id="invoice-root">
+<div id="invoice-root" class="fee-receipt">
   <style>
     html, body { margin: 0; padding: 0; width: 100%; min-height: 100vh; }
     body { background: #ffffff; }
@@ -603,11 +645,11 @@ export const generateFeeReceiptPDF = async (
             <tbody>
               <tr>
                 <td class="calc-label">মোট টাকা</td>
-                <td class="calc-value">৳ ${payment.totalPayable.toFixed(2)}</td>
+                <td class="calc-value">${formatPaymentMoney(payment.totalPayable, 'amountPaid')}</td>
               </tr>
               <tr>
                 <td class="calc-label">জমা টাকা</td>
-                <td class="calc-value">৳ ${payment.amountPaid.toFixed(2)}</td>
+                <td class="calc-value">${formatPaymentMoney(payment.amountPaid, 'amountPaid')}</td>
               </tr>
               <tr>
                 <td class="calc-label">${dueLabel} টাকা</td>
@@ -670,7 +712,7 @@ export const generateFeeReceiptPDF = async (
           <div class="section-heading">সংক্ষেপ / Summary</div>
           <div class="kv-grid" style="grid-template-columns: 1fr;">
             <div class="kv"><b>রশিদ নং:</b> <span class="value">${escapeHtml(payment.receiptNo)}</span></div>
-            <div class="kv"><b>জমা :</b> <span class="value">৳ ${payment.amountPaid.toFixed(2)}</span> <span class="small">(${numberToBengaliWords(payment.amountPaid)})</span></div>
+            <div class="kv"><b>জমা :</b> <span class="value">${formatPaymentMoney(payment.amountPaid, 'amountPaid')}</span> <span class="small">(${numberToBengaliWords(payment.amountPaid)})</span></div>
             <div class="kv"><b>${remainingLabel} :</b> <span class="value" style="color: ${remainingColor};">${remainingValue}</span></div>
           </div>
         </div>
@@ -718,6 +760,7 @@ export const generateFeeReceiptPDF = async (
   document.body.appendChild(wrapper);
 
   const container = wrapper.querySelector('#invoice-root') as HTMLElement;
+  applyFeeReceiptFontSize(container);
 
   // Make sure the logo image is fully decoded before we capture it
   await new Promise<void>((resolve) => {
@@ -1060,7 +1103,7 @@ export const generateFinanceReportPDF = (
     doc.setFontSize(8);
     doc.setTextColor(60, 60, 60);
     doc.text(f.label, f.x + 4, cardY + 7);
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
     doc.text(`TK ${f.val.toFixed(2)}`, f.x + 4, cardY + 17);
   });
