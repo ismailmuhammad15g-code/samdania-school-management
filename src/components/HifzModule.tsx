@@ -3,8 +3,9 @@ import { Student, FeePayment, LedgerTransaction, MONTHS } from '../types';
 import { generateFeeReceiptPDF } from './PDFGenerator';
 import PasswordConfirmModal from './PasswordConfirmModal';
 import HifzFinanceModule from './HifzFinanceModule';
-import { parseNumberWithBengaliSupport, normalizeForComparison, isClassMatch } from '../lib/digitUtils';
+import { parseNumberWithBengaliSupport, normalizeForComparison, isClassMatch, formatBangladeshMobile } from '../lib/digitUtils';
 import { useLiveStudentSearch } from '../lib/useLiveStudentSearch';
+import { BENGALI_MONTHS, sendSchoolSms } from '../lib/sms';
 import { 
   Users, 
   Search, 
@@ -30,6 +31,11 @@ const feeNum = (v: unknown): number => {
   const n = parseNumberWithBengaliSupport(v);
   return Number.isFinite(n) ? n : 0;
 };
+
+interface PendingSms {
+  recipient: string;
+  text: string;
+}
 
 interface HifzModuleProps {
   students: Student[];
@@ -67,6 +73,9 @@ export default function HifzModule({
   
   // Tab states inside Fees module
   const [activeSubTab, setActiveSubTab] = useState<'directory' | 'collect' | 'history' | 'finance'>('directory');
+  const [smsFeedback, setSmsFeedback] = useState('');
+  const [failedSms, setFailedSms] = useState<PendingSms | null>(null);
+  const [smsSending, setSmsSending] = useState(false);
   
   // Live search — fresh Supabase fetch on every query
   const {
@@ -279,7 +288,7 @@ export default function HifzModule({
   };
 
   // Collect Payment Form Submit
-  const handlePaymentSubmit = (e: React.FormEvent) => {
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedStudent) {
       alert('Please select a student first.');
@@ -296,7 +305,7 @@ export default function HifzModule({
       return;
     }
 
-    onCollectPayment({
+    const payment = {
       studentId: selectedStudent.id,
       studentName: selectedStudent.name,
       class: selectedStudent.class,
@@ -313,7 +322,9 @@ export default function HifzModule({
       totalPayable: calculatedPayable,
       amountPaid: enteredCash,
       receivedBy: paymentFormData.receivedBy,
-    });
+    };
+    const studentForSms = selectedStudent;
+    onCollectPayment(payment);
 
     // Reset payment states
     setSelectedStudent(null);
@@ -333,6 +344,47 @@ export default function HifzModule({
     });
     setIsCollectOpen(false);
     setActiveSubTab('history');
+    setSmsFeedback('');
+
+    const recipient = formatBangladeshMobile(studentForSms.contact);
+    if (!recipient) {
+      setSmsFeedback(`Payment was recorded, but no valid Bangladesh guardian phone number is saved for ${studentForSms.name}.`);
+      return;
+    }
+
+    const monthIndex = MONTHS.indexOf(payment.month);
+    const paymentDate = new Date(`${payment.date}T00:00:00`);
+    const due = Math.max(0, payment.totalPayable - payment.amountPaid);
+    const smsText = [
+      payment.studentName,
+      `${payment.class}${studentForSms.roll ? `-${studentForSms.roll}` : ''}`,
+      `${BENGALI_MONTHS[monthIndex] || payment.month}-${paymentDate.getFullYear().toLocaleString('bn-BD')}`,
+      `মোট-${payment.totalPayable.toLocaleString('bn-BD')}`,
+      `জমা-${payment.amountPaid.toLocaleString('bn-BD')}`,
+      `বকেয়া-${due.toLocaleString('bn-BD')}`,
+      'সামদানিয়া তালিমুল ইসলাম',
+      'মাদ্রাসার পক্ষ থেকে ধন্যবাদ',
+    ].join('\n');
+    await deliverSms({
+      recipient,
+      text: smsText,
+      successMessage: 'Hifz payment recorded and SMS submitted',
+      failureMessage: 'Hifz payment was recorded, but SMS could not be sent',
+    });
+  };
+
+  const deliverSms = async (sms: PendingSms & { successMessage?: string; failureMessage?: string }) => {
+    setSmsSending(true);
+    setFailedSms(null);
+    try {
+      const result = await sendSchoolSms([sms.recipient], sms.text);
+      setSmsFeedback(`${sms.successMessage || 'Hifz payment SMS submitted'} (request ${result.requestId}).`);
+    } catch (error) {
+      setFailedSms({ recipient: sms.recipient, text: sms.text });
+      setSmsFeedback(`${sms.failureMessage || 'Hifz payment SMS could not be sent'}: ${error instanceof Error ? error.message : 'Unknown SMS error'}`);
+    } finally {
+      setSmsSending(false);
+    }
   };
 
   // Dynamic list of all available classes (from settings + students)
@@ -373,6 +425,22 @@ export default function HifzModule({
             </button>
           )}
       </div>
+
+      {smsFeedback && (
+        <div className={`flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-xs ${smsFeedback.includes('could not') || smsFeedback.includes('no valid') ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`} role="status">
+          <span className="min-w-0 flex-1">{smsFeedback}</span>
+          {failedSms && (
+            <button
+              type="button"
+              disabled={smsSending}
+              onClick={() => void deliverSms(failedSms)}
+              className="rounded-lg bg-amber-700 px-3 py-1.5 font-bold text-white disabled:opacity-50 cursor-pointer"
+            >
+              {smsSending ? 'Sending…' : 'Retry SMS'}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Nested Sub-Tabs Navigation */}
       <div className="border-b border-stone-100 flex flex-wrap gap-2">
