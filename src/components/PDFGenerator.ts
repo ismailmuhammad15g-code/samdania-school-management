@@ -703,10 +703,10 @@ export const generateFeeReceiptPDF = async (
           <div class="section-heading">অফিস কপি / Admin</div>
           <div class="kv-grid" style="grid-template-columns: 1fr;">
             <div class="kv"><b>আইডি:</b> <span class="value">${escapeHtml(payment.studentId)}</span></div>
+            <div class="kv"><b>নাম:</b> <span class="value">${escapeHtml(payment.studentName)}</span></div>
             ${options.studentRoll ? `<div class="kv"><b>রোল:</b> <span class="value">${escapeHtml(options.studentRoll)}</span></div>` : ''}
             <div class="kv"><b>শ্রেণী:</b> <span class="value">${escapeHtml(payment.class)}</span></div>
             <div class="kv"><b>তারিখ:</b> <span class="value">${formatDateBn(payment.date)}</span></div>
-            <div class="kv"><b>প্রাপ্ত / Received By:</b> <span class="value">${escapeHtml(payment.receivedBy || '—')}</span></div>
           </div>
         </div>
         <div class="card">
@@ -715,6 +715,7 @@ export const generateFeeReceiptPDF = async (
             <div class="kv"><b>রশিদ নং:</b> <span class="value">${escapeHtml(payment.receiptNo)}</span></div>
             <div class="kv"><b>জমা :</b> <span class="value">${formatPaymentMoney(payment.amountPaid, 'amountPaid')}</span> <span class="small">(${numberToBengaliWords(payment.amountPaid)})</span></div>
             <div class="kv"><b>${remainingLabel} :</b> <span class="value" style="color: ${remainingColor};">${remainingValue}</span></div>
+            <div class="kv"><b>প্রাপ্ত / Received By:</b> <span class="value">${escapeHtml(payment.receivedBy || '—')}</span></div>
           </div>
         </div>
       </div>
