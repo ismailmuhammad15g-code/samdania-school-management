@@ -3,9 +3,9 @@ import { TeacherStaff, SalaryPayment, MONTHS, TeacherAccount, StaffAccount, Teac
 import { TeacherAvatar, PhotoLightbox } from './TeacherPhoto';
 import AttendanceReportTab from './AttendanceReportTab';
 import PasswordConfirmModal from './PasswordConfirmModal';
-import { parseNumberWithBengaliSupport } from '../lib/digitUtils';
+import { parseNumberWithBengaliSupport, formatBangladeshMobile } from '../lib/digitUtils';
 import { getSalaryBalance } from '../lib/salary';
-import { BENGALI_MONTHS, formatBangladeshMobile, getMainMadrasahApiUrl, sendSchoolSms } from '../lib/sms';
+import { BENGALI_MONTHS, sendSchoolSms } from '../lib/sms';
 import { 
   Briefcase, 
   Plus, 
@@ -38,7 +38,6 @@ import {
 const isNonTeachingPortalAccount = (account: TeacherAccount): boolean =>
   /\b(staff|driver|cleaner|guard|security|accountant|cook|caretaker|peon|janitor|maintenance|office)\b/i
     .test(`${account.role || ''} ${account.designation || ''}`);
-const SMS_API_URL = getMainMadrasahApiUrl();
 
 interface SalariesModuleProps {
   teachersStaff: TeacherStaff[];
@@ -412,7 +411,7 @@ function SalariesModuleContent({
           `বকেয়া: ৳${Math.max(0, remaining - sendAmount).toLocaleString('bn-BD')}`,
           'সামদানিয়া তালিমূল ইসলাম মাদ্রাসা।',
         ].join('\n');
-        const sms = await sendSchoolSms(SMS_API_URL, [recipient], smsText);
+        const sms = await sendSchoolSms([recipient], smsText);
         resultMessage += ` SMS submitted (request ${sms.requestId}).`;
       } catch (error) {
         resultMessage += ` Salary was recorded, but SMS could not be sent: ${error instanceof Error ? error.message : 'Unknown SMS error'}`;

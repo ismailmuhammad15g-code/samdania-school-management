@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } fr
 import type { Session } from '@supabase/supabase-js';
 import { ImagePlus, RefreshCw, ShieldCheck, Trash2, Upload, X } from 'lucide-react';
 import { getAuthClient, hasWebsiteAdminAccess } from '../lib/auth';
-import { getMainMadrasahApiUrl } from '../lib/sms';
+import { getMainMadrasahApiUrl } from '../lib/websiteApi';
 import type { TeacherAccount } from '../types';
 import MainMadrasahTeachers from './MainMadrasahTeachers';
 

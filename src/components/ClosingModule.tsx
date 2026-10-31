@@ -3,6 +3,8 @@ import { LedgerTransaction } from '../types';
 import logo2 from '../assets/images/logo2.png';
 import { generateClosingReportPDF, ClosingReportRow } from './PDFGenerator';
 import DescriptiveReportTab from './DescriptiveReportTab';
+import { BarChart } from './LedgerBarChart';
+import { categoryBreakdown, fmt, groupByPeriod, netText, type PeriodStat } from '../lib/ledgerStats';
 import {
   FileStack,
   Download,
@@ -18,125 +20,6 @@ import {
 interface ClosingModuleProps {
   ledger: LedgerTransaction[];
 }
-
-interface PeriodStat {
-  key: string;
-  label: string;
-  income: number;
-  expense: number;
-  net: number;
-}
-
-const fmt = (n: number) =>
-  `৳ ${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
-const netText = (n: number) => (n < 0 ? `আপনি ঋণে আছেন ${fmt(n)}` : fmt(n));
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-];
-
-const monthLabel = (key: string) => {
-  const [y, m] = key.split('-');
-  const idx = parseInt(m, 10) - 1;
-  return `${MONTH_NAMES[idx] || m} ${y}`;
-};
-
-const groupByPeriod = (
-  ledger: LedgerTransaction[],
-  mode: 'month' | 'year'
-): PeriodStat[] => {
-  const map = new Map<string, { income: number; expense: number }>();
-  ledger.forEach((t) => {
-    const d = new Date(t.date);
-    if (isNaN(d.getTime())) return;
-    const key = mode === 'month'
-      ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-      : `${d.getFullYear()}`;
-    const cur = map.get(key) || { income: 0, expense: 0 };
-    if (t.type === 'Income') cur.income += t.amount;
-    else cur.expense += t.amount;
-    map.set(key, cur);
-  });
-
-  return [...map.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([key, v]) => ({
-      key,
-      label: mode === 'month' ? monthLabel(key) : key,
-      income: v.income,
-      expense: v.expense,
-      net: v.income - v.expense,
-    }));
-};
-
-const categoryBreakdown = (ledger: LedgerTransaction[], type: 'Income' | 'Expense') => {
-  const map = new Map<string, number>();
-  ledger.forEach((t) => {
-    if (t.type !== type) return;
-    map.set(t.category, (map.get(t.category) || 0) + t.amount);
-  });
-  return [...map.entries()]
-    .map(([category, amount]) => ({ category, amount }))
-    .sort((a, b) => b.amount - a.amount);
-};
-
-// ── Elegant grouped bar chart (income vs expense) ────────────────────────────
-const BarChart: React.FC<{ data: PeriodStat[]; compact?: boolean }> = ({ data, compact }) => {
-  const maxVal = Math.max(1, ...data.map((d) => Math.max(d.income, d.expense)));
-  const chartH = compact ? 160 : 200;
-
-  if (data.length === 0) {
-    return (
-      <div className="h-48 flex items-center justify-center text-stone-400 text-sm italic bg-[#faf9f6] rounded-xl border border-dashed border-stone-200">
-        No transaction records found.
-      </div>
-    );
-  }
-
-  return (
-    <div className={`overflow-x-auto ${compact ? '' : 'pb-1'}`}>
-      <div className="flex items-end gap-3 min-w-max px-1" style={{ height: chartH }}>
-        {data.map((d) => {
-          const incH = (d.income / maxVal) * (chartH - 40);
-          const expH = (d.expense / maxVal) * (chartH - 40);
-          return (
-            <div key={d.key} className="flex flex-col items-center justify-end" style={{ width: 46 }}>
-              <div className="flex items-end gap-1" style={{ height: chartH - 24 }}>
-                {/* Income bar */}
-                <div className="flex flex-col items-center justify-end group relative">
-                  <span className="text-[9px] font-bold text-[#4a5d4e] mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {fmt(d.income)}
-                  </span>
-                  <div
-                    className="w-4 rounded-t-sm bg-[#4a5d4e] hover:bg-[#3d4d41] transition-all"
-                    style={{ height: `${Math.max(2, incH)}px` }}
-                    title={`Income: ${fmt(d.income)}`}
-                  ></div>
-                </div>
-                {/* Expense bar */}
-                <div className="flex flex-col items-center justify-end group relative">
-                  <span className="text-[9px] font-bold text-[#b27d6d] mb-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {fmt(d.expense)}
-                  </span>
-                  <div
-                    className="w-4 rounded-t-sm bg-[#b27d6d] hover:bg-[#a36b5c] transition-all"
-                    style={{ height: `${Math.max(2, expH)}px` }}
-                    title={`Expense: ${fmt(d.expense)}`}
-                  ></div>
-                </div>
-              </div>
-              <span className="text-[9px] font-semibold text-stone-500 mt-1.5 text-center leading-tight w-[60px] truncate">
-                {d.label}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
 
 const ClosingSection: React.FC<{
   title: string;

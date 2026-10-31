@@ -25,6 +25,7 @@ import {
   TeacherResignationRequest
 } from './types';
 import { initDatabase, dbGet, dbSet, dbDelete, dbRefreshKey, dbExportAll, onDbChange } from './lib/localDb';
+import { DatabaseOfflineScreen, DatabaseStatusBanner, isDbUnavailable, useDbStatus } from './components/DatabaseStatus';
 import { pushNotification } from './lib/notifications';
 import { getSession, logoutAdmin, setAdminReadOnlyFlag, getAdminReadOnlyFlag, ensureAdminCredentials } from './lib/auth';
 import { verifyScanned, generateQRSet, todayISO, classifyArrival, formatAttendanceTime, type AttendanceScanResult } from './lib/attendance';
@@ -141,7 +142,7 @@ function AppLoadingSkeleton() {
   );
 }
 
-export default function App() {
+function SchoolApp() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   // When true the whole admin console is rendered read-only (Viewer Admin role).
   const [adminReadOnly, setAdminReadOnly] = useState(false);
@@ -176,15 +177,13 @@ export default function App() {
 
   const adminName = 'samdaniaa madrasah';
 
-  // ── LOCAL SQL DATABASE (SQLite/WASM persisted to IndexedDB) ──
-  const [dbReady, setDbReady] = useState(false);
-  useEffect(() => {
-    let mounted = true;
-    initDatabase()
-      .then(() => { if (mounted) setDbReady(true); })
-      .catch(() => { if (mounted) setDbReady(true); }); // proceed with in-memory fallback
-    return () => { mounted = false; };
-  }, []);
+  // ── DATABASE (Supabase kv_store) ──
+  // The app only opens once the real data has been loaded. If loading fails, a
+  // "cannot reach the database" screen is shown and loading is retried automatically —
+  // never an empty app that could later overwrite the stored records.
+  const dbStatus = useDbStatus();
+  useEffect(() => { void initDatabase(); }, []);
+  const dbReady = dbStatus.state === 'online' || dbStatus.state === 'unconfigured';
 
   // Core records database state — loaded from the local SQL db once it is ready
   const [students, setStudents] = useState<Student[]>([]);
@@ -1564,6 +1563,7 @@ export default function App() {
     addLoan: handleAddLoan,
   };
 
+  if (isDbUnavailable(dbStatus)) return <DatabaseOfflineScreen status={dbStatus} />;
   if (!dbReady || authLoading) return <AppLoadingSkeleton />;
 
   if (!isAuthenticated) {
@@ -1999,5 +1999,14 @@ export default function App() {
       </footer>
 
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <>
+      <DatabaseStatusBanner />
+      <SchoolApp />
+    </>
   );
 }

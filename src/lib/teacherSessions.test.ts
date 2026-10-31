@@ -29,8 +29,14 @@ test('rejects sessions that do not match the teacher account', () => {
   assert.equal(validateTeacherPortalSession(mismatched, account), false);
 });
 
-test('rejects sessions when the account is no longer verified', () => {
+test('keeps unverified teachers signed in so they can finish onboarding', () => {
   const session = createTeacherPortalSession(account);
   const unverified = { ...account, status: 'unverified' as const };
-  assert.equal(validateTeacherPortalSession(session, unverified), false);
+  assert.equal(validateTeacherPortalSession(session, unverified), true);
+});
+
+test('locks out sessions once the account is rejected', () => {
+  const session = createTeacherPortalSession(account);
+  const rejected = { ...account, status: 'rejected' as const };
+  assert.equal(validateTeacherPortalSession(session, rejected), false);
 });

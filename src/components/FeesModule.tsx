@@ -3,10 +3,10 @@ import { createPortal } from 'react-dom';
 import { Student, FeePayment, MONTHS, StudentAttendanceRecord } from '../types';
 import { generateFeeReceiptPDF } from './PDFGenerator';
 import PasswordConfirmModal from './PasswordConfirmModal';
-import { parseNumberWithBengaliSupport, normalizeForComparison, isClassMatch } from '../lib/digitUtils';
+import { parseNumberWithBengaliSupport, normalizeForComparison, isClassMatch, formatBangladeshMobile } from '../lib/digitUtils';
 import { useLiveStudentSearch } from '../lib/useLiveStudentSearch';
 import { uploadStudentPhoto } from '../lib/imgbb';
-import { BENGALI_MONTHS, formatBangladeshMobile, getMainMadrasahApiUrl, sendSchoolSms } from '../lib/sms';
+import { BENGALI_MONTHS, sendSchoolSms } from '../lib/sms';
 import logo2 from '../assets/images/logo2.png';
 import { 
   Users, 
@@ -39,7 +39,13 @@ const feeNum = (v: unknown): number => {
   const n = parseNumberWithBengaliSupport(v);
   return Number.isFinite(n) ? n : 0;
 };
-const SMS_API_URL = getMainMadrasahApiUrl();
+
+interface PendingSms {
+  recipient: string;
+  text: string;
+  successMessage: string;
+  failureMessage: string;
+}
 
 const formatFeeSmsClass = (className: string): string => ({
   'প্রথম': '১ম',
@@ -100,6 +106,8 @@ export default function FeesModule({
   const [attendancePrintMode, setAttendancePrintMode] = useState<'absent' | 'present' | 'all'>('all');
   const [smsFeedback, setSmsFeedback] = useState('');
   const [sendingAbsenceSmsId, setSendingAbsenceSmsId] = useState('');
+  const [failedSms, setFailedSms] = useState<PendingSms | null>(null);
+  const [smsSending, setSmsSending] = useState(false);
   const sortedStudentAttendance = [...studentAttendanceRecords].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const attendanceByClass = useMemo(() => {
     const groups = new Map<string, StudentAttendanceRecord[]>();
@@ -534,11 +542,27 @@ export default function FeesModule({
       'সামদানিয়া তালিমুল ইসলাম',
       'মাদ্রাসার পক্ষ থেকে ধন্যবাদ',
     ].join('\n');
+    await deliverSms({
+      recipient,
+      text: smsText,
+      successMessage: 'Payment recorded and SMS submitted',
+      failureMessage: 'Payment was recorded, but SMS could not be sent',
+    });
+  };
+
+  // Sends one SMS and reports the outcome. A failed message is kept so it can be
+  // retried with one click — the payment itself is already saved and never repeated.
+  const deliverSms = async (sms: PendingSms) => {
+    setSmsSending(true);
+    setFailedSms(null);
     try {
-      const result = await sendSchoolSms(SMS_API_URL, [recipient], smsText);
-      setSmsFeedback(`Payment recorded and SMS submitted (request ${result.requestId}).`);
+      const result = await sendSchoolSms([sms.recipient], sms.text);
+      setSmsFeedback(`${sms.successMessage} (request ${result.requestId}).`);
     } catch (error) {
-      setSmsFeedback(`Payment was recorded, but SMS could not be sent: ${error instanceof Error ? error.message : 'Unknown SMS error'}`);
+      setFailedSms(sms);
+      setSmsFeedback(`${sms.failureMessage}: ${error instanceof Error ? error.message : 'Unknown SMS error'}`);
+    } finally {
+      setSmsSending(false);
     }
   };
 
@@ -552,15 +576,14 @@ export default function FeesModule({
     if (!window.confirm(`Send an absence SMS to the guardian of ${item.studentName}?`)) return;
     setSendingAbsenceSmsId(item.id);
     setSmsFeedback('');
-    try {
-      const smsText = `প্রিয় অভিভাবক, আপনার সন্তান ${item.studentName}, রোল ${student.roll || '—'}, শ্রেণি ${className}, তারিখ ${date}-এ মাদ্রাসায় অনুপস্থিত ছিল। সামদানিয়া তালিমূল ইসলাম মাদ্রাসার পক্ষ থেকে জানানো হচ্ছে।`;
-      const result = await sendSchoolSms(SMS_API_URL, [recipient], smsText);
-      setSmsFeedback(`Absence SMS submitted for ${item.studentName} (request ${result.requestId}).`);
-    } catch (error) {
-      setSmsFeedback(`Absence SMS could not be sent: ${error instanceof Error ? error.message : 'Unknown SMS error'}`);
-    } finally {
-      setSendingAbsenceSmsId('');
-    }
+    const smsText = `প্রিয় অভিভাবক, আপনার সন্তান ${item.studentName}, রোল ${student.roll || '—'}, শ্রেণি ${className}, তারিখ ${date}-এ মাদ্রাসায় অনুপস্থিত ছিল। সামদানিয়া তালিমূল ইসলাম মাদ্রাসার পক্ষ থেকে জানানো হচ্ছে।`;
+    await deliverSms({
+      recipient,
+      text: smsText,
+      successMessage: `Absence SMS submitted for ${item.studentName}`,
+      failureMessage: 'Absence SMS could not be sent',
+    });
+    setSendingAbsenceSmsId('');
   };
 
   // Dynamic list of all available classes (from settings + students)
@@ -625,9 +648,19 @@ export default function FeesModule({
           )}
       </div>
       {smsFeedback && (
-        <p className={`rounded-lg border px-4 py-3 text-xs ${smsFeedback.includes('could not') || smsFeedback.includes('no valid') ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`} role="status">
-          {smsFeedback}
-        </p>
+        <div className={`flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-xs ${smsFeedback.includes('could not') || smsFeedback.includes('no valid') ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`} role="status">
+          <span className="min-w-0 flex-1">{smsFeedback}</span>
+          {failedSms && (
+            <button
+              type="button"
+              disabled={smsSending}
+              onClick={() => void deliverSms(failedSms)}
+              className="rounded-lg bg-amber-700 px-3 py-1.5 font-bold text-white disabled:opacity-50 cursor-pointer"
+            >
+              {smsSending ? 'Sending…' : 'Retry SMS'}
+            </button>
+          )}
+        </div>
       )}
 
       {/* Nested Sub-Tabs Navigation */}

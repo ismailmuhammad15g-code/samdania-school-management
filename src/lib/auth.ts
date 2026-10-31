@@ -1,6 +1,7 @@
 import { sha256Hex } from './sha256';
 import { dbGet, dbSet, isDbReady } from './localDb';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { getSupabaseConfig, loadSupabaseConfig } from './supabaseConfig';
 
 const SESSION_KEY = 'samdani_admin_session';
 const CRED_KEY = 'samdani_admin_credentials';
@@ -9,18 +10,17 @@ const ENV = import.meta.env;
 const AUTH_SALT = (ENV.VITE_AUTH_SALT as string | undefined)?.trim() || 'SamdaniaSalt2026';
 const DEFAULT_EMAIL = (ENV.VITE_ADMIN_EMAIL as string | undefined)?.trim() || 'admin@madrasah.com';
 const DEFAULT_PASSWORD = (ENV.VITE_ADMIN_PASSWORD as string | undefined)?.trim() || 'admin123';
-const SUPABASE_URL = ENV.VITE_SUPABASE_URL?.trim();
-const SUPABASE_ANON_KEY = ENV.VITE_SUPABASE_ANON_KEY?.trim();
 const authClientHolder = globalThis as typeof globalThis & {
   __samdaniaWebsiteAdminAuthClient?: SupabaseClient;
 };
 
 export function getAuthClient(): SupabaseClient {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  const config = getSupabaseConfig();
+  if (!config) {
     throw new Error('Supabase URL and anon key are required for the website admin API.');
   }
   if (!authClientHolder.__samdaniaWebsiteAdminAuthClient) {
-    authClientHolder.__samdaniaWebsiteAdminAuthClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    authClientHolder.__samdaniaWebsiteAdminAuthClient = createClient(config.url, config.anonKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -147,6 +147,7 @@ export async function loginAdmin(email: string, password: string): Promise<Admin
   }
 
   try {
+    await loadSupabaseConfig();
     const client = getAuthClient();
     const { data, error } = await client.auth.signInWithPassword({
       email: acceptedEmail,
