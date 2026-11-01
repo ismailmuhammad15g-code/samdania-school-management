@@ -234,7 +234,7 @@ export default function FeesModule({
     fatherName: '',
     motherName: '',
     extraInfo: '',
-    previousDue: '0',
+    previousDue: '',
     currentMonthFee: '0',
     examFee: '0',
     transport: '0',
@@ -246,7 +246,7 @@ export default function FeesModule({
   const [paymentFormData, setPaymentFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     month: MONTHS[new Date().getMonth()],
-    previousDue: '0',
+    previousDue: '',
     currentMonthFee: '0',
     examFee: '0',
     transport: '0',
@@ -306,8 +306,8 @@ export default function FeesModule({
     setPaymentFormData({
       date: new Date().toISOString().split('T')[0],
       month: MONTHS[new Date().getMonth()],
-      previousDue: student.digitInputs?.previousDue ?? student.previousDue.toString(),
-      currentMonthFee: student.digitInputs?.currentMonthFee ?? student.currentMonthFee.toString(),
+      previousDue: student.previousDue > 0 ? student.previousDue.toString() : '',
+      currentMonthFee: student.currentMonthFee.toString(),
       examFee: student.digitInputs?.examFee ?? student.examFee.toString(),
       transport: student.digitInputs?.transport ?? student.transport.toString(),
       electricity: student.digitInputs?.electricity ?? student.electricity.toString(),
@@ -333,7 +333,7 @@ export default function FeesModule({
       fatherName: '',
       motherName: '',
       extraInfo: '',
-      previousDue: '0',
+      previousDue: '',
       currentMonthFee: '0',
       examFee: '0',
       transport: '0',
@@ -359,8 +359,8 @@ export default function FeesModule({
       fatherName: student.fatherName || '',
       motherName: student.motherName || '',
       extraInfo: student.extraInfo || '',
-      previousDue: student.digitInputs?.previousDue ?? student.previousDue.toString(),
-      currentMonthFee: student.digitInputs?.currentMonthFee ?? student.currentMonthFee.toString(),
+      previousDue: student.previousDue > 0 ? student.previousDue.toString() : '',
+      currentMonthFee: student.digitInputs?.currentMonthFee ?? (student.monthlyTuition ?? student.currentMonthFee).toString(),
       examFee: student.digitInputs?.examFee ?? student.examFee.toString(),
       transport: student.digitInputs?.transport ?? student.transport.toString(),
       electricity: student.digitInputs?.electricity ?? student.electricity.toString(),
@@ -407,6 +407,10 @@ export default function FeesModule({
       return;
     }
 
+    const currentEditingStudent = editingStudentId
+      ? students.find((student) => student.id === editingStudentId) || editingStudent
+      : null;
+    const monthlyTuition = parseNumberWithBengaliSupport(studentFormData.currentMonthFee) || 0;
     const payload = {
       name: studentFormData.name,
       roll: rollStr, // Store as string exactly as typed
@@ -418,7 +422,10 @@ export default function FeesModule({
       photoUrl: studentPhotoLink.trim() || studentPhotoUrl || undefined,
       photo_url: studentPhotoLink.trim() || studentPhotoUrl || undefined,
       previousDue: parseNumberWithBengaliSupport(studentFormData.previousDue) || 0,
-      currentMonthFee: parseNumberWithBengaliSupport(studentFormData.currentMonthFee) || 0,
+      currentMonthFee: currentEditingStudent
+        ? currentEditingStudent.currentMonthFee
+        : monthlyTuition,
+      monthlyTuition,
       examFee: parseNumberWithBengaliSupport(studentFormData.examFee) || 0,
       transport: parseNumberWithBengaliSupport(studentFormData.transport) || 0,
       electricity: parseNumberWithBengaliSupport(studentFormData.electricity) || 0,
@@ -436,10 +443,6 @@ export default function FeesModule({
         advancePaid: studentFormData.advancePaid,
       },
     };
-
-    const currentEditingStudent = editingStudentId
-      ? students.find((student) => student.id === editingStudentId) || editingStudent
-      : null;
 
     if (editingStudentId && currentEditingStudent) {
       onEditStudent({ ...currentEditingStudent, ...payload, id: editingStudentId });
@@ -857,7 +860,9 @@ export default function FeesModule({
                           </td>
                           <td className="py-3 px-4 text-center font-bold font-mono">{s.roll}</td>
                           <td className="py-3 px-4 whitespace-nowrap font-mono font-bold text-stone-700">৳ {feeNum(s.currentMonthFee).toFixed(2)}</td>
-                          <td className="py-3 px-4 whitespace-nowrap font-mono font-bold text-[#b27d6d]">৳ {feeNum(s.previousDue).toFixed(2)}</td>
+                          <td className="py-3 px-4 whitespace-nowrap font-mono font-bold text-[#b27d6d]">
+                            {feeNum(s.previousDue) > 0 ? `৳ ${feeNum(s.previousDue).toFixed(2)}` : ''}
+                          </td>
                           <td className="py-3 px-4 whitespace-nowrap font-mono text-stone-500">৳ {feeNum(s.transport).toFixed(2)}</td>
                           <td className="py-3 px-4 whitespace-nowrap">
                             <span className={`font-mono font-bold text-sm ${totalPayable > 0 ? 'text-[#b27d6d]' : 'text-[#4a5d4e]'}`}>

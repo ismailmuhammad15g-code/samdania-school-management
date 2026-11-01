@@ -32,6 +32,7 @@ import { verifyScanned, generateQRSet, todayISO, classifyArrival, formatAttendan
 import { clearTeacherPortalSession, createTeacherPortalSession, persistTeacherPortalSession, validateTeacherPortalSession, loadTeacherPortalSession } from './lib/teacherSessions';
 import { clearStaffPortalSession, createStaffPortalSession, persistStaffPortalSession, validateStaffPortalSession, loadStaffPortalSession } from './lib/staffSessions';
 import { getSalaryBalance } from './lib/salary';
+import { currentFeeMonth, rolloverMonthlyFees } from './lib/monthlyFeeRollover';
 
 import LoginPage from './components/LoginPage';
 import AdminRoleSelect from './components/AdminRoleSelect';
@@ -234,6 +235,7 @@ function SchoolApp() {
 
   // Persistent invoice counter — never decrements, survives deletes
   const [invoiceCounter, setInvoiceCounter] = useState<number>(101);
+  const [studentIdCounter, setStudentIdCounter] = useState<number>(101);
 
   // Prevents the initial empty React state from being written back to Supabase
   // before the first hydrate completes (that race was wiping student data).
@@ -258,8 +260,21 @@ function SchoolApp() {
 
     ensureAdminCredentials();
 
+    const savedPayments = load<FeePayment[]>('samdani_payments', []);
+    const latestTuitionByStudent = new Map<string, { date: string; amount: number }>();
+    savedPayments.forEach((payment) => {
+      const current = latestTuitionByStudent.get(payment.studentId);
+      if (!current || payment.date > current.date) {
+        latestTuitionByStudent.set(payment.studentId, {
+          date: payment.date,
+          amount: Number(payment.currentMonthFee) || 0,
+        });
+      }
+    });
+
     const sharedStudents = dbGet('students');
-    setStudents(sharedStudents != null ? load('students', [], (value: any[]) => value.map((student) => ({
+    const studentRecords = sharedStudents != null ? load<any[]>('students', []) : load<any[]>('samdani_students', []);
+    const loadedStudents = studentRecords.map((student) => ({
       ...student,
       id: student.id || student.studentId || `ST-${Date.now().toString(36)}`,
       name: student.name || student.banglaName || '',
@@ -279,11 +294,19 @@ function SchoolApp() {
       water: Number(student.water) || 0,
       waiver: Number(student.waiver) || 0,
       advancePaid: Number(student.advancePaid) || 0,
-    }))) : load('samdani_students', []));
+      monthlyTuition: student.monthlyTuition != null
+        ? Number(student.monthlyTuition)
+        : Number(student.currentMonthFee) || latestTuitionByStudent.get(student.id || student.studentId)?.amount || 0,
+    }));
+    setStudents(rolloverMonthlyFees(loadedStudents).students);
+    const maxStudentNumber = loadedStudents.reduce((max, student) => {
+      const match = /^ST-(\d+)$/i.exec(student.id);
+      return match ? Math.max(max, Number(match[1])) : max;
+    }, 100);
+    const storedStudentIdCounter = Number(dbGet('samdani_student_id_counter')) || 101;
+    setStudentIdCounter(Math.max(storedStudentIdCounter, maxStudentNumber + 1));
     setLedger(load('samdani_ledger', []));
-    setPayments(load('samdani_payments', [], (v: any[]) =>
-      v.map((p, i) => ({ ...p, invoiceNo: p.invoiceNo ?? (101 + i) }))
-    ));
+    setPayments(savedPayments.map((p, i) => ({ ...p, invoiceNo: p.invoiceNo ?? (101 + i) })));
     setHifzStudents(load('samdani_hifz_students', []));
     setHifzPayments(load('samdani_hifz_payments', [], (v: any[]) =>
       v.map((p, i) => ({ ...p, invoiceNo: p.invoiceNo ?? (101 + i) }))
@@ -347,6 +370,16 @@ function SchoolApp() {
   // Initial load once the db is ready.
   useEffect(() => { syncFromDb(); }, [syncFromDb]);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setStudents((current) => {
+        const rollover = rolloverMonthlyFees(current);
+        return rollover.changed ? rollover.students : current;
+      });
+    }, 60_000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Live re-sync on every db change coming from another tab or device.
   // Debounced so a burst of writes coalesces into a single refresh.
   useEffect(() => {
@@ -379,6 +412,7 @@ function SchoolApp() {
     });
   }, [canPersist]);
   useEffect(() => { if (canPersist) dbSet('samdani_invoice_counter', invoiceCounter); }, [invoiceCounter, canPersist]);
+  useEffect(() => { if (canPersist) dbSet('samdani_student_id_counter', studentIdCounter); }, [studentIdCounter, canPersist]);
   useEffect(() => {
     if (canPersist) dbSet('samdani_students', students.map((student) => ({
       ...student,
@@ -604,12 +638,19 @@ function SchoolApp() {
   // MODULE ACTION: STUDENT DIRECTORY
   // ----------------------------------------------------
   const handleAddStudent = async (studentData: Omit<Student, 'id'>) => {
+    let nextStudentNumber = studentIdCounter;
+    while (students.some((student) => student.id === `ST-${nextStudentNumber}`)) {
+      nextStudentNumber += 1;
+    }
+
     const newStudent: Student = {
       ...studentData,
-      // Unique ID — old ST-100..999 scheme collided and broke live search re-renders
-      id: `ST-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: `ST-${nextStudentNumber}`,
+      monthlyTuition: studentData.monthlyTuition ?? studentData.currentMonthFee,
+      feeMonth: studentData.feeMonth || currentFeeMonth(),
     };
 
+    setStudentIdCounter(nextStudentNumber + 1);
     const updatedStudents = [...students, newStudent];
     setStudents(updatedStudents);
 
@@ -696,6 +737,16 @@ function SchoolApp() {
           electricity: 0,
           water: 0,
           waiver: 0,
+          digitInputs: {
+            ...s.digitInputs,
+            previousDue: remainingBalance > 0 ? String(remainingBalance) : '',
+            currentMonthFee: String(s.monthlyTuition ?? s.currentMonthFee),
+            examFee: '0',
+            transport: '0',
+            electricity: '0',
+            water: '0',
+            waiver: '0',
+          },
         };
       }
       return s;

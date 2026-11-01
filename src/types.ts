@@ -39,6 +39,8 @@ export interface Student {
   photo_url?: string;
   previousDue: number;
   currentMonthFee: number;
+  monthlyTuition?: number;
+  feeMonth?: string;
   examFee: number;
   transport: number;
   electricity: number;
