@@ -315,10 +315,13 @@ body {
 
   /* The wrapper that holds exactly 8 students */
   .a4-page-wrapper {
-    height: 281mm;
+    height: 276mm;
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: 2mm;
+    break-inside: avoid;
+    page-break-inside: avoid;
     page-break-after: always; /* Force a new page after every 8 slips */
   }
 
@@ -328,7 +331,8 @@ body {
 
   /* The individual Student Slip (exactly 1/8th of the page) */
   .due-slip {
-    height: calc((100% - 14mm) / 8);
+    height: calc((276mm - 14mm) / 8);
+    flex: 0 0 calc((276mm - 14mm) / 8);
     border: 2px solid #000;
     box-sizing: border-box;
     padding: 3px 6px;
@@ -336,6 +340,8 @@ body {
     flex-direction: column;
     justify-content: space-between;
     overflow: hidden;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   /* Inner Grid Thin Borders */

@@ -173,6 +173,10 @@ export default function FeesModule({
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedSlips, setGeneratedSlips] = useState<Student[]>([]);
+  const [selectedSlipIds, setSelectedSlipIds] = useState<Set<string>>(new Set());
+  const [editedSlipAmounts, setEditedSlipAmounts] = useState<Record<string, number>>({});
+  const [editingSlipId, setEditingSlipId] = useState<string | null>(null);
+  const [slipAmountDraft, setSlipAmountDraft] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [generationMessage, setGenerationMessage] = useState('');
@@ -184,6 +188,10 @@ export default function FeesModule({
     const totalDue = totalPayable - student.waiver - student.advancePaid;
     return Math.max(0, totalDue);
   };
+
+  const printableSlips = generatedSlips.filter((student) => selectedSlipIds.has(student.id));
+  const getSlipTotalDue = (student: Student): number =>
+    editedSlipAmounts[student.id] ?? calculateTotalDue(student);
 
   // Fetch students with dues > 0 based on selected classes
   const fetchStudentsWithDues = async () => {
@@ -198,6 +206,9 @@ export default function FeesModule({
       });
 
       setGeneratedSlips(filteredStudents);
+      setSelectedSlipIds(new Set(filteredStudents.map((student) => student.id)));
+      setEditedSlipAmounts({});
+      setEditingSlipId(null);
       setShowPreview(true);
       setIsModalOpen(false);
       setGenerationMessage('Slips generated successfully!');
@@ -1714,7 +1725,9 @@ export default function FeesModule({
             <div className="bg-white rounded-xl border border-stone-200 shadow-sm p-6">
               <div className="sticky top-0 bg-white border-b border-stone-200 pb-4 mb-4 z-10">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-[#2c332d]">Preview ({generatedSlips.length} students)</h3>
+                  <h3 className="text-sm font-bold text-[#2c332d]">
+                    Preview ({printableSlips.length} of {generatedSlips.length} selected)
+                  </h3>
                   <button
                     onClick={() => setShowPreview(false)}
                     className="text-xs text-stone-500 hover:text-[#4a5d4e] cursor-pointer"
@@ -1725,6 +1738,17 @@ export default function FeesModule({
                 {generationMessage && (
                   <p className="mt-2 text-xs font-semibold text-[#4a5d4e]" role="status">{generationMessage}</p>
                 )}
+                <label className="mt-3 flex items-center gap-2 text-xs text-stone-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={generatedSlips.length > 0 && printableSlips.length === generatedSlips.length}
+                    onChange={(e) => setSelectedSlipIds(
+                      e.target.checked ? new Set(generatedSlips.map((student) => student.id)) : new Set()
+                    )}
+                    className="h-4 w-4 accent-[#4a5d4e]"
+                  />
+                  Select all students
+                </label>
                 <button
                   onClick={async () => {
                     setIsPrinting(true);
@@ -1738,24 +1762,88 @@ export default function FeesModule({
                       setIsPrinting(false);
                     }
                   }}
+                  disabled={printableSlips.length === 0 || isPrinting}
                   className="mt-3 w-full bg-[#4a5d4e] hover:bg-[#3b4a3b] text-white text-xs font-bold py-2.5 rounded-lg shadow-sm active:scale-95 cursor-pointer border border-[#4a5d4e] flex items-center justify-center gap-2"
                 >
                   <Printer className="h-3.5 w-3.5" />
-                  Print Now
+                  Print Selected ({printableSlips.length})
                 </button>
               </div>
 
               <div className="space-y-3">
                 {generatedSlips.map((student) => {
-                  const totalDue = calculateTotalDue(student);
+                  const totalDue = getSlipTotalDue(student);
+                  const isSelected = selectedSlipIds.has(student.id);
+                  const isEditing = editingSlipId === student.id;
                   return (
-                    <div key={student.id} className="flex items-center justify-between p-3 bg-[#f5f2ed]/50 rounded-lg border border-stone-200">
+                    <div key={student.id} className="flex items-center justify-between gap-3 p-3 bg-[#f5f2ed]/50 rounded-lg border border-stone-200">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={(e) => setSelectedSlipIds((current) => {
+                          const next = new Set(current);
+                          if (e.target.checked) next.add(student.id);
+                          else next.delete(student.id);
+                          return next;
+                        })}
+                        aria-label={`Select due slip for ${student.name}`}
+                        className="h-4 w-4 accent-[#4a5d4e] shrink-0"
+                      />
                       <div className="flex-1">
                         <p className="text-xs font-bold text-[#2c332d]">{student.name}</p>
                         <p className="text-[10px] text-stone-500">Class: {student.class} | Roll: {student.roll}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-mono font-bold text-[#b27d6d]">৳ {totalDue.toLocaleString()}</p>
+                        {isEditing ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-xs font-bold text-[#b27d6d]">৳</span>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              value={slipAmountDraft}
+                              onChange={(e) => setSlipAmountDraft(e.target.value)}
+                              aria-label={`Due amount for ${student.name}`}
+                              className="w-24 rounded border border-stone-300 bg-white px-2 py-1 text-right text-xs font-mono"
+                            />
+                            <button
+                              onClick={() => {
+                                const amount = parseNumberWithBengaliSupport(slipAmountDraft.replace(/,/g, ''));
+                                if (!Number.isFinite(amount) || amount < 0) {
+                                  alert('Please enter a valid non-negative amount.');
+                                  return;
+                                }
+                                setEditedSlipAmounts((current) => ({ ...current, [student.id]: amount }));
+                                setEditingSlipId(null);
+                              }}
+                              className="rounded p-1 text-[#4a5d4e] hover:bg-stone-200"
+                              title="Save amount"
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => setEditingSlipId(null)}
+                              className="rounded p-1 text-stone-500 hover:bg-stone-200"
+                              title="Cancel editing"
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-1">
+                            <p className="text-xs font-mono font-bold text-[#b27d6d]">৳ {totalDue.toLocaleString()}</p>
+                            <button
+                              onClick={() => {
+                                setSlipAmountDraft(String(totalDue));
+                                setEditingSlipId(student.id);
+                              }}
+                              className="rounded p-1 text-stone-500 hover:bg-stone-200 hover:text-[#4a5d4e]"
+                              title="Edit due amount"
+                              aria-label={`Edit due amount for ${student.name}`}
+                            >
+                              <Edit2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        )}
                         <p className="text-[10px] text-stone-400">
                           Previous: ৳ {student.previousDue.toLocaleString()} |
                           Monthly: ৳ {student.currentMonthFee.toLocaleString()} |
@@ -1890,10 +1978,10 @@ export default function FeesModule({
     )}
     {typeof document !== 'undefined' && createPortal(
       <div id="print-slips-container" aria-hidden="true">
-        {Array.from({ length: Math.ceil(generatedSlips.length / 8) }, (_, pageIndex) => (
+        {Array.from({ length: Math.ceil(printableSlips.length / 8) }, (_, pageIndex) => (
           <div className="a4-page-wrapper" key={`slip-page-${pageIndex}`}>
-            {generatedSlips.slice(pageIndex * 8, pageIndex * 8 + 8).map((student) => {
-              const finalTotalDue = calculateTotalDue(student);
+            {printableSlips.slice(pageIndex * 8, pageIndex * 8 + 8).map((student) => {
+              const finalTotalDue = getSlipTotalDue(student);
               return (
                 <div className="due-slip" key={student.id}>
                   <div style={{ textAlign: 'center', lineHeight: 1.4, marginBottom: 2 }}>
