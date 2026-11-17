@@ -40,6 +40,11 @@ const feeNum = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const getNextMonth = (month: string): string => {
+  const index = MONTHS.indexOf(month);
+  return MONTHS[index < 0 ? 0 : (index + 1) % MONTHS.length];
+};
+
 interface PendingSms {
   recipient: string;
   text: string;
@@ -265,6 +270,8 @@ export default function FeesModule({
     water: '0',
     waiver: '0',
     advancePaid: '0',
+    nextMonthAdvance: '0',
+    nextMonthAdvanceMonth: getNextMonth(MONTHS[new Date().getMonth()]),
     receivedBy: '', // Admin who physically received the cash (required)
     amountPaid: '', // The raw cash amount collected
   });
@@ -282,7 +289,8 @@ export default function FeesModule({
     numVal(paymentFormData.transport) +
     numVal(paymentFormData.electricity) +
     numVal(paymentFormData.water)
-  ) - numVal(paymentFormData.waiver) - numVal(paymentFormData.advancePaid);
+  ) - numVal(paymentFormData.waiver) - numVal(paymentFormData.advancePaid) +
+    numVal(paymentFormData.nextMonthAdvance);
 
   // Sync payments tab opening
   useEffect(() => {
@@ -325,6 +333,8 @@ export default function FeesModule({
       water: student.digitInputs?.water ?? student.water.toString(),
       waiver: student.digitInputs?.waiver ?? student.waiver.toString(),
       advancePaid: student.digitInputs?.advancePaid ?? student.advancePaid.toString(),
+      nextMonthAdvance: '0',
+      nextMonthAdvanceMonth: getNextMonth(MONTHS[new Date().getMonth()]),
       receivedBy: '', // must be selected by user
       amountPaid: '', // default empty to fill
     });
@@ -498,6 +508,8 @@ export default function FeesModule({
       water: numVal(paymentFormData.water),
       waiver: numVal(paymentFormData.waiver),
       advancePaid: numVal(paymentFormData.advancePaid),
+      nextMonthAdvance: numVal(paymentFormData.nextMonthAdvance),
+      nextMonthAdvanceMonth: paymentFormData.nextMonthAdvanceMonth,
       totalPayable: calculatedPayable,
       amountPaid: enteredCash,
       receivedBy: paymentFormData.receivedBy,
@@ -510,6 +522,7 @@ export default function FeesModule({
         water: paymentFormData.water,
         waiver: paymentFormData.waiver,
         advancePaid: paymentFormData.advancePaid,
+        nextMonthAdvance: paymentFormData.nextMonthAdvance,
         amountPaid: paymentFormData.amountPaid,
       },
     };
@@ -529,6 +542,8 @@ export default function FeesModule({
       water: '0',
       waiver: '0',
       advancePaid: '0',
+      nextMonthAdvance: '0',
+      nextMonthAdvanceMonth: getNextMonth(MONTHS[new Date().getMonth()]),
       receivedBy: '',
       amountPaid: '',
     });
@@ -985,7 +1000,11 @@ export default function FeesModule({
                   <label className="block text-[11px] font-bold text-stone-700 mb-1">Fee Month *</label>
                   <select
                     value={paymentFormData.month}
-                    onChange={(e) => setPaymentFormData({ ...paymentFormData, month: e.target.value })}
+                    onChange={(e) => setPaymentFormData({
+                      ...paymentFormData,
+                      month: e.target.value,
+                      nextMonthAdvanceMonth: getNextMonth(e.target.value),
+                    })}
                     className="w-full bg-stone-50 text-xs border border-stone-200 rounded-lg px-3 py-2 focus:outline-none focus:border-[#4a5d4e]"
                   >
                     {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
@@ -1056,6 +1075,29 @@ export default function FeesModule({
                       onChange={(e) => setPaymentFormData({ ...paymentFormData, advancePaid: e.target.value })}
                       className="w-full bg-white text-xs border border-stone-200 rounded px-2 py-1.5 focus:outline-none focus:border-[#4a5d4e] font-mono font-bold"
                     />
+                  </div>
+
+                  {/* Advance payment for a selected upcoming month */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-stone-600 mb-1">Next Month Advance (পরবর্তী মাসের অগ্রিম)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={paymentFormData.nextMonthAdvance}
+                        onChange={(e) => setPaymentFormData({ ...paymentFormData, nextMonthAdvance: e.target.value })}
+                        aria-label="Next month advance amount"
+                        className="min-w-0 w-1/2 bg-white text-xs border border-stone-200 rounded px-2 py-1.5 focus:outline-none focus:border-[#4a5d4e] font-mono font-bold"
+                      />
+                      <select
+                        value={paymentFormData.nextMonthAdvanceMonth}
+                        onChange={(e) => setPaymentFormData({ ...paymentFormData, nextMonthAdvanceMonth: e.target.value })}
+                        aria-label="Month for advance payment"
+                        className="min-w-0 w-1/2 bg-white text-xs border border-stone-200 rounded px-2 py-1.5 focus:outline-none focus:border-[#4a5d4e]"
+                      >
+                        {MONTHS.map((month) => <option key={month} value={month}>{month}</option>)}
+                      </select>
+                    </div>
                   </div>
 
                   {/* Transport */}
@@ -1146,7 +1188,7 @@ export default function FeesModule({
                 <div>
                   <span className="text-[10px] text-[#4a5d4e] uppercase font-bold">Automatic Calculation</span>
                   <p className="text-xs text-stone-500 mt-1">
-                    Total Payable = (Prev Due + Current Month + Exam + Transport + Elec + Water) - Waiver - Advance Paid.
+                    Total Payable = (Prev Due + Current Month + Exam + Transport + Elec + Water + Next Month Advance) - Waiver - Advance Paid.
                   </p>
                   <div className="text-xl font-black text-[#2c332d] mt-2 font-mono">
                     Total Payable: ৳ {calculatedPayable.toFixed(2)}

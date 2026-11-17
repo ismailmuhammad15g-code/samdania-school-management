@@ -22,7 +22,7 @@ export interface LedgerTransaction {
 }
 
 export type FeeDigitInputs = Partial<Record<
-  'previousDue' | 'currentMonthFee' | 'examFee' | 'transport' | 'electricity' | 'water' | 'waiver' | 'advancePaid' | 'amountPaid',
+  'previousDue' | 'currentMonthFee' | 'examFee' | 'transport' | 'electricity' | 'water' | 'waiver' | 'advancePaid' | 'nextMonthAdvance' | 'amountPaid',
   string
 >>;
 
@@ -79,6 +79,8 @@ export interface FeePayment {
   water: number;
   waiver: number;
   advancePaid: number;
+  nextMonthAdvance?: number;
+  nextMonthAdvanceMonth?: string;
   totalPayable: number;
   amountPaid: number;
   receivedBy: string;

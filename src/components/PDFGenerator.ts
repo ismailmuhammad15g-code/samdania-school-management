@@ -377,6 +377,13 @@ export const generateFeeReceiptPDF = async (
     { num: '০৬', label: 'পানি বিল', val: payment.water, minus: false, key: 'water' },
     { num: '০৭', label: 'মওকুফ', val: payment.waiver, minus: true, key: 'waiver' },
     { num: '০৮', label: 'অগ্রিম', val: payment.advancePaid, minus: true, key: 'advancePaid' },
+    {
+      num: '০৯',
+      label: `পরবর্তী মাসের অগ্রিম${payment.nextMonthAdvanceMonth ? ` (${BENGALI_MONTHS[payment.nextMonthAdvanceMonth] || escapeHtml(payment.nextMonthAdvanceMonth)})` : ''}`,
+      val: payment.nextMonthAdvance ?? 0,
+      minus: false,
+      key: 'nextMonthAdvance',
+    },
   ] satisfies Array<{ num: string; label: string; val: number; minus: boolean; key: keyof FeeDigitInputs }>)
     // Only the heads that really carry an amount (the ones that get a ✔ tick)
     // are printed — unselected and zero-taka heads are left out completely.
