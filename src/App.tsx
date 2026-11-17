@@ -715,12 +715,6 @@ function SchoolApp() {
     const updatedPayments = [newPayment, ...payments];
     setPayments(updatedPayments);
 
-    pushNotification({
-      type: 'payment',
-      title: 'Fee payment received',
-      message: `${paymentData.studentName} paid ৳${paymentData.amountPaid.toLocaleString()} (${paymentData.month})`,
-    });
-
     // Crucial: Update the target student's outstanding balances!
     // The outstanding balance is adjusted. If they paid more than total, it contributes to advancePaid.
     // If they paid partially, the remainder becomes their new previousDue! This is extremely logical.

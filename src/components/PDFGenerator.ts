@@ -331,7 +331,9 @@ export const generateFeeReceiptPDF = async (
   const bnMonth = BENGALI_MONTHS[payment.month] || payment.month;
   const digitInputs = { ...options.digitInputs, ...payment.digitInputs };
   const formatPaymentMoney = (amount: number, key: keyof FeeDigitInputs): string =>
-    formatFeeMoney(amount, digitInputs[key] ?? digitInputs.amountPaid);
+    options.school === 'hifz'
+      ? `৳ ${formatTakaBengali(amount)}`
+      : formatFeeMoney(amount, digitInputs[key] ?? digitInputs.amountPaid);
   
   const remaining = payment.totalPayable - payment.amountPaid;
   let remainingLabel: string;
