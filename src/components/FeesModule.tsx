@@ -40,6 +40,22 @@ const feeNum = (v: unknown): number => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const formatBanglaDeadlineDate = (dateStr: string): string => {
+  if (!dateStr) return '';
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!match) return dateStr;
+
+  const [, year, month, day] = match;
+  const monthNames = [
+    'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর',
+  ];
+  const monthIndex = Number(month) - 1;
+  const toBanglaDigits = (value: string) => value.replace(/\d/g, (digit) => '০১২৩৪৫৬৭৮৯'[Number(digit)]);
+
+  return `${toBanglaDigits(String(Number(day)))} ${monthNames[monthIndex] || ''} ${toBanglaDigits(year)}`;
+};
+
 const getNextMonth = (month: string): string => {
   const index = MONTHS.indexOf(month);
   return MONTHS[index < 0 ? 0 : (index + 1) % MONTHS.length];
@@ -2065,7 +2081,7 @@ export default function FeesModule({
                   </table>
                   <div className="due-slip-footer-block">
                     <p style={{ fontSize: 12, lineHeight: 1.15, margin: '2px 0' }}>
-                      আগামি {deadlineDate} ইং তারিখের মধ্যে আপনার বকেয়া {finalTotalDue.toLocaleString('bn-BD')} টাকা পরিশোধ করুন।
+                      আগামি {formatBanglaDeadlineDate(deadlineDate)} তারিখের মধ্যে আপনার বকেয়া {finalTotalDue.toLocaleString('bn-BD')} টাকা পরিশোধ করুন।
                     </p>
                     <div style={{ textAlign: 'right', paddingRight: 20, fontSize: 12, lineHeight: 1.1 }}>
                       অধ্যক্ষ
