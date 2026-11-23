@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { LedgerTransaction } from '../types';
+import { FeePayment, LedgerTransaction } from '../types';
 import logo2 from '../assets/images/logo2.png';
 import { generateClosingReportPDF, ClosingReportRow } from './PDFGenerator';
 import DescriptiveReportTab from './DescriptiveReportTab';
@@ -19,6 +19,7 @@ import {
 
 interface ClosingModuleProps {
   ledger: LedgerTransaction[];
+  payments: FeePayment[];
 }
 
 const ClosingSection: React.FC<{
@@ -185,7 +186,7 @@ const ClosingSection: React.FC<{
   );
 };
 
-export default function ClosingModule({ ledger }: ClosingModuleProps) {
+export default function ClosingModule({ ledger, payments }: ClosingModuleProps) {
   const [activeView, setActiveView] = useState<'closing' | 'reports'>('closing');
   const [busy, setBusy] = useState<null | 'monthly' | 'yearly'>(null);
 
@@ -259,7 +260,7 @@ export default function ClosingModule({ ledger }: ClosingModuleProps) {
         <button onClick={() => setActiveView('reports')} className={`px-4 py-2 rounded-lg text-xs font-bold ${activeView === 'reports' ? 'bg-[#4a5d4e] text-white' : 'text-stone-600 hover:bg-stone-100'}`}>বর্ণনামূলক রিপোর্ট ও প্রিন্ট</button>
       </div>
 
-      {activeView === 'reports' ? <DescriptiveReportTab ledger={ledger} /> : <>
+      {activeView === 'reports' ? <DescriptiveReportTab ledger={ledger} payments={payments} /> : <>
       {/* Monthly Closing */}
       <ClosingSection
         title="Monthly Closing"

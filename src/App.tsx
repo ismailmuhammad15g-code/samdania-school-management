@@ -2020,6 +2020,7 @@ function SchoolApp() {
         {activeTab === 'closing' && (
           <ClosingModule
             ledger={ledger}
+            payments={payments}
           />
         )}
 

@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { FileText, Printer, RefreshCw } from 'lucide-react';
-import { LedgerTransaction } from '../types';
+import { FeePayment, LedgerTransaction } from '../types';
 import { numberToBengaliWords, toBengaliDigits } from '../lib/bengaliNumbers';
 
-interface Props { ledger: LedgerTransaction[]; }
+interface Props { ledger: LedgerTransaction[]; payments: FeePayment[]; }
 type ReportType = 'daily' | 'monthly' | 'custom';
 
 const CLASS_OPTIONS = ['শিশু', 'প্রথম', 'দ্বিতীয়', 'তৃতীয়', 'চতুর্থ', 'পঞ্চম'];
@@ -38,7 +38,7 @@ const getIncomeClass = (entry: LedgerTransaction): string | null => {
   return CLASS_OPTIONS.find((item) => normalizeClassName(text).includes(normalizeClassName(item))) || null;
 };
 
-export default function DescriptiveReportTab({ ledger }: Props) {
+export default function DescriptiveReportTab({ ledger, payments }: Props) {
   const [type, setType] = useState<ReportType>('monthly');
   const [classFilter, setClassFilter] = useState('all');
   const [singleDate, setSingleDate] = useState(today);
@@ -67,14 +67,21 @@ export default function DescriptiveReportTab({ ledger }: Props) {
   const balance = totalIncome - totalExpense;
   const incomeSectors = Object.entries(incomes.reduce<Record<string, number>>((out, entry) => { out[entry.category] = (out[entry.category] || 0) + entry.amount; return out; }, {}));
   const expenseSectors = Object.entries(expenses.reduce<Record<string, number>>((out, entry) => { out[entry.category] = (out[entry.category] || 0) + entry.amount; return out; }, {}));
-  const classBreakdown = Object.entries(incomes.reduce<Record<string, { count: number; amount: number }>>((out, entry) => {
-    const key = getIncomeClass(entry) || entry.category || 'অন্যান্য';
-    out[key] = out[key] || { count: 0, amount: 0 };
-    out[key].count += 1;
-    out[key].amount += entry.amount;
-    return out;
-  }, Object.fromEntries(REPORT_CLASSES.map((key) => [key, { count: 0, amount: 0 }]))));
+  const classBreakdown = Object.entries(payments
+    .filter((payment) => payment.date >= range.start && payment.date <= range.end)
+    .reduce<Record<string, { count: number; amount: number }>>((out, payment) => {
+      const normalized = normalizeClassName(payment.class);
+      const key = CLASS_OPTIONS.find((item) => normalizeClassName(item) === normalized)
+        || normalizeClassName(payment.class)
+        || 'অন্যান্য';
+      out[key] = out[key] || { count: 0, amount: 0 };
+      out[key].count += 1;
+      out[key].amount += payment.amountPaid;
+      return out;
+    }, Object.fromEntries(REPORT_CLASSES.map((key) => [key, { count: 0, amount: 0 }]))));
   const classNarrative = classBreakdown.map(([key, value]) => <><strong>{key}</strong> শ্রেণীতে মোট {toBengaliDigits(value.count)} টি রসিদ মারফত {money(value.amount)}; </>);
+  const classPaymentCount = classBreakdown.reduce((sum, [, value]) => sum + value.count, 0);
+  const classPaymentAmount = classBreakdown.reduce((sum, [, value]) => sum + value.amount, 0);
 
   const generate = () => setGenerated(true);
   const print = () => {
@@ -117,10 +124,10 @@ export default function DescriptiveReportTab({ ledger }: Props) {
       {!generated ? <div className="report-empty-state">রিপোর্ট তৈরি করতে উপরের বোতামটি চাপুন।</div> : <>
         <header className="report-institute-header"><h1>সামদানিয়া তালিমুল ইসলাম মাদ্রাসা, গলাচিপা</h1><p>শ্রেণীভিত্তিক দৈনিক আয়-ব্যয় ও হিসাব শাখা</p><span>ঠিকানা: পীর বদরুল ইসলাম সামদানী কমপ্লেক্স, খানকায়ে ফুরফুরা শরীফ, ২ নং ওয়ার্ড, গলাচিপা, পটুয়াখালী | মোবাইল: 01792776433</span><strong>মাসিক/মেয়াদী পূর্ণাঙ্গ বর্ণনামূলক অডিট ও হিসাব প্রতিবেদন</strong><em>{range.title}</em></header>
         <div className="report-title-badge">হিসাবের বর্ণনামূলক পর্যালোচনা</div>
-        {classFilter !== 'all' ? <ClassSpecificReport target={classFilter} rows={rows} periodTitle={range.title} /> : <>
+        {classFilter !== 'all' ? <ClassSpecificReport target={classFilter} rows={rows} payments={payments} range={range} periodTitle={range.title} /> : <>
         <div className="report-summary-grid"><div className="report-stat income"><span>মোট আয়</span><strong>{money(totalIncome)}</strong></div><div className="report-stat expense"><span>মোট ব্যয়</span><strong>{money(totalExpense)}</strong></div><div className="report-stat balance"><span>নিট উদ্বৃত্ত</span><strong>{money(balance)}</strong></div></div>
         <div className="narrative-box"><h3>হিসাবের বর্ণনামূলক পর্যালোচনা</h3><p><strong>পরিপূর্ণ মাসিক/মেয়াদী হিসাব বিবরণী:</strong> পর্যালোচিত {range.title} মেয়াদে প্রতিষ্ঠানে ছাত্রছাত্রীদের বেতন, ফি ও বিবিধ খাত হতে সর্বমোট <b className="narrative-success">{money(totalIncome)}</b> আদায় হয়েছে। একই সময়কালে প্রাতিষ্ঠানিক প্রশাসনিক, স্টেশনারি ও পরিচালন ব্যয় হিসেবে মোট <b className="narrative-danger">{money(totalExpense)}</b> পরিশোধ করা হয়েছে। হিসাব সমাপনান্তে উক্ত সময়ের নিট উদ্বৃত্ত/স্থাবর ক্যাশ ব্যালেন্স নির্ধারিত হয়েছে <b className="narrative-highlight">{money(balance)}</b> (কথায়: <em>{words(balance)}</em>)।</p><p><strong>শ্রেণীভিত্তিক মোট আদায়:</strong> {classNarrative}</p></div>
-        <ReportTable title="শ্রেণী/খাতভিত্তিক মোট আদায়" headers={['ক্র.নং', 'শ্রেণী/খাত', 'রসিদ সংখ্যা', 'মোট আদায়', 'শতাংশ']} rows={classBreakdown.map(([key, value], index) => [toBengaliDigits(index + 1), key, toBengaliDigits(value.count), money(value.amount), percent(value.amount)])} footer={['', 'মোট', toBengaliDigits(incomes.length), money(totalIncome), totalIncome ? '১০০%' : '০%']} />
+        <ReportTable title="শ্রেণী/খাতভিত্তিক মোট আদায়" headers={['ক্র.নং', 'শ্রেণী/খাত', 'রসিদ সংখ্যা', 'মোট আদায়', 'শতাংশ']} rows={classBreakdown.map(([key, value], index) => [toBengaliDigits(index + 1), key, toBengaliDigits(value.count), money(value.amount), percent(value.amount)])} footer={['', 'মোট', toBengaliDigits(classPaymentCount), money(classPaymentAmount), classPaymentAmount ? '১০০%' : '০%']} />
         <div className="report-two-column"><ReportTable title="আয়ের খাত" headers={['খাত', 'টাকা']} rows={incomeSectors.map(([key, value]) => [key, money(value)])} /><ReportTable title="ব্যয়ের খাত" headers={['খাত', 'টাকা']} rows={expenseSectors.map(([key, value]) => [key, money(value)])} /></div>
         <ReportTable title="বিস্তারিত আয় লেনদেন" headers={['রসিদ নং', 'তারিখ', 'শ্রেণি/তহবিল', 'বিবরণ', 'খাত', 'টাকা']} rows={incomes.map((entry) => [entry.id, dateBn(entry.date), entry.fund, entry.description || '—', entry.category, money(entry.amount)])} />
         <ReportTable title="বিস্তারিত ব্যয় লেনদেন" headers={['ক্র.নং', 'তারিখ', 'ব্যয়ের খাত', 'মন্তব্য/বিবরণ', 'টাকা']} rows={expenses.map((entry, index) => [toBengaliDigits(index + 1), dateBn(entry.date), entry.category, entry.description || '—', money(entry.amount)])} />
@@ -131,18 +138,48 @@ export default function DescriptiveReportTab({ ledger }: Props) {
   </div>;
 }
 
-function ClassSpecificReport({ target, rows, periodTitle }: { target: string; rows: LedgerTransaction[]; periodTitle: string }) {
+function ClassSpecificReport({ target, rows, payments, range, periodTitle }: { target: string; rows: LedgerTransaction[]; payments: FeePayment[]; range: { start: string; end: string }; periodTitle: string }) {
+  const selectedPayments = CLASS_OPTIONS.includes(target)
+    ? payments.filter((payment) =>
+        payment.date >= range.start
+        && payment.date <= range.end
+        && normalizeClassName(payment.class) === normalizeClassName(target)
+      )
+    : [];
   const incomes = rows.filter((entry) => entry.type === 'Income' && (
-    CLASS_OPTIONS.includes(target) ? getIncomeClass(entry) === target : entry.category === target || entry.fund === target
+    CLASS_OPTIONS.includes(target)
+      ? false
+      : entry.category === target || entry.fund === target
   ));
-  const total = incomes.reduce((sum, entry) => sum + entry.amount, 0);
-  const sectors = Object.entries(incomes.reduce<Record<string, { count: number; amount: number }>>((out, entry) => { const key = entry.category || 'অন্যান্য'; out[key] = out[key] || { count: 0, amount: 0 }; out[key].count += 1; out[key].amount += entry.amount; return out; }, {}));
-  const average = incomes.length ? total / incomes.length : 0;
+  const total = selectedPayments.length
+    ? selectedPayments.reduce((sum, payment) => sum + payment.amountPaid, 0)
+    : incomes.reduce((sum, entry) => sum + entry.amount, 0);
+  const sectors = selectedPayments.length
+    ? Object.entries(selectedPayments.reduce<Record<string, { count: number; amount: number }>>((out, payment) => {
+        const key = 'শিক্ষার্থী বেতন ও ফি';
+        out[key] = out[key] || { count: 0, amount: 0 };
+        out[key].count += 1;
+        out[key].amount += payment.amountPaid;
+        return out;
+      }, {}))
+    : Object.entries(incomes.reduce<Record<string, { count: number; amount: number }>>((out, entry) => {
+        const key = entry.category || 'অন্যান্য';
+        out[key] = out[key] || { count: 0, amount: 0 };
+        out[key].count += 1;
+        out[key].amount += entry.amount;
+        return out;
+      }, {}));
+  const receiptCount = selectedPayments.length || incomes.length;
+  const average = receiptCount ? total / receiptCount : 0;
   return <>
-    <div className="report-summary-grid"><div className="report-stat income"><span>{target}-এর সর্বমোট আদায়</span><strong>{money(total)}</strong></div><div className="report-stat balance"><span>রসিদ/এন্ট্রি সংখ্যা</span><strong>{toBengaliDigits(incomes.length)}</strong></div><div className="report-stat month-income"><span>গড় জমা</span><strong>{money(average)}</strong></div></div>
-    <div className="narrative-box"><h3>{target}-এর প্রাতিষ্ঠানিক পর্যালোচনা</h3><p>পর্যালোচিত {periodTitle} সময়ে <strong>{target}</strong> খাতে মোট <b className="narrative-success">{money(total)}</b> আদায় হয়েছে। টাকা কথায়: <b className="narrative-highlight">{words(total)}</b>। মোট রসিদ সংখ্যা {toBengaliDigits(incomes.length)} টি।</p></div>
-    <ReportTable title={`${target}-এর খাতভিত্তিক আদায়`} headers={['ক্র.নং', 'আদায়ের খাত', 'রসিদ সংখ্যা', 'মোট আদায়', 'শতাংশ']} rows={sectors.map(([key, value], index) => [toBengaliDigits(index + 1), key, toBengaliDigits(value.count), money(value.amount), total ? `${toBengaliDigits(((value.amount / total) * 100).toFixed(1))}%` : '০%'])} footer={['', 'মোট', toBengaliDigits(incomes.length), money(total), total ? '১০০%' : '০%']} />
-    <ReportTable title={`${target}-এর বিস্তারিত আদায় ও রসিদ খতিয়ান`} headers={['ক্র.নং', 'রসিদ/মেমো', 'রোল', 'নাম/বিবরণ', 'খাত', 'তারিখ', 'টাকা', 'মন্তব্য']} rows={incomes.map((entry, index) => [toBengaliDigits(index + 1), entry.id, '—', entry.description || '—', entry.category, dateBn(entry.date), money(entry.amount), entry.description || '—'])} />
+    <div className="report-summary-grid"><div className="report-stat income"><span>{target}-এর সর্বমোট আদায়</span><strong>{money(total)}</strong></div><div className="report-stat balance"><span>রসিদ/এন্ট্রি সংখ্যা</span><strong>{toBengaliDigits(receiptCount)}</strong></div><div className="report-stat month-income"><span>গড় জমা</span><strong>{money(average)}</strong></div></div>
+    <div className="narrative-box"><h3>{target}-এর প্রাতিষ্ঠানিক পর্যালোচনা</h3><p>পর্যালোচিত {periodTitle} সময়ে <strong>{target}</strong> খাতে মোট <b className="narrative-success">{money(total)}</b> আদায় হয়েছে। টাকা কথায়: <b className="narrative-highlight">{words(total)}</b>। মোট রসিদ সংখ্যা {toBengaliDigits(receiptCount)} টি।</p></div>
+    <ReportTable title={`${target}-এর খাতভিত্তিক আদায়`} headers={['ক্র.নং', 'আদায়ের খাত', 'রসিদ সংখ্যা', 'মোট আদায়', 'শতাংশ']} rows={sectors.map(([key, value], index) => [toBengaliDigits(index + 1), key, toBengaliDigits(value.count), money(value.amount), total ? `${toBengaliDigits(((value.amount / total) * 100).toFixed(1))}%` : '০%'])} footer={['', 'মোট', toBengaliDigits(receiptCount), money(total), total ? '১০০%' : '০%']} />
+    <ReportTable title={`${target}-এর বিস্তারিত আদায় ও রসিদ খতিয়ান`} headers={['ক্র.নং', 'রসিদ/মেমো', 'রোল', 'নাম/বিবরণ', 'খাত', 'তারিখ', 'টাকা', 'মন্তব্য']} rows={
+      selectedPayments.length
+        ? selectedPayments.map((payment, index) => [toBengaliDigits(index + 1), String(payment.invoiceNo), '—', payment.studentName, 'শিক্ষার্থী বেতন ও ফি', dateBn(payment.date), money(payment.amountPaid), payment.month])
+        : incomes.map((entry, index) => [toBengaliDigits(index + 1), entry.id, '—', entry.description || '—', entry.category, dateBn(entry.date), money(entry.amount), entry.description || '—'])
+    } />
     <div className="in-words-box"><strong>মোট আদায়কৃত টাকা কথায়:</strong> {words(total)}</div>
     <div className="print-signatures"><div>প্রস্তুতকারীর স্বাক্ষর</div><div>হিসাবরক্ষকের স্বাক্ষর</div><div>অধ্যক্ষের স্বাক্ষর</div></div>
   </>;
