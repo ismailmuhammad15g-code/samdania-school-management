@@ -29,6 +29,18 @@ export interface AppNotification {
 const KEY = 'samdani_notifications';
 const MAX = 250;
 
+const ENABLED_NOTIFICATION_TYPES = new Set<NotificationType>([
+  'teacher',
+  'resignation',
+  'leave',
+  'attendance',
+  'system',
+]);
+
+export function isNotificationEnabled(type: NotificationType): boolean {
+  return ENABLED_NOTIFICATION_TYPES.has(type);
+}
+
 // In-tab signal so the bell re-renders instantly (same tab), independent of
 // the async db-change broadcast. Cross-tab/device updates still arrive via
 // localDb's onDbChange (BroadcastChannel + Supabase Realtime).
@@ -44,16 +56,26 @@ export function getNotifications(): AppNotification[] {
   try {
     const v = dbGet(KEY);
     if (Array.isArray(v)) {
-      return v.map((item: any) => item && typeof item.content === 'string'
-        ? {
-            id: item.id,
-            type: 'system' as const,
-            title: item.title || 'Notice',
-            message: item.content,
-            createdAt: item.createdAt || Date.parse(item.published_at) || Date.now(),
-            read: Boolean(item.read),
+      return v
+        .filter((item: any) => {
+          if (!item) return false;
+          if (typeof item.content === 'string') {
+            const id = String(item.id || '');
+            if (id.startsWith('NTF-')) return false;
+            return true;
           }
-        : item as AppNotification);
+          return isNotificationEnabled(item.type);
+        })
+        .map((item: any) => item && typeof item.content === 'string'
+          ? {
+              id: item.id,
+              type: 'system' as const,
+              title: item.title || 'Notice',
+              message: item.content,
+              createdAt: item.createdAt || Date.parse(item.published_at) || Date.now(),
+              read: Boolean(item.read),
+            }
+          : item as AppNotification);
     }
     if (v && typeof v === 'object' && 'message' in v) {
       const item = v as { id?: string; title?: string; message: string; createdAt?: number };
@@ -74,9 +96,12 @@ export function getNotifications(): AppNotification[] {
 
 /** Push a new notification. Persisted to the db so it syncs everywhere live. */
 export function pushNotification(n: Omit<AppNotification, 'id' | 'createdAt' | 'read'>): void {
+  if (!isNotificationEnabled(n.type)) return;
+
   const list = getNotifications();
   const item = {
     id: `NTF-${Date.now().toString(36)}-${Math.floor(Math.random() * 900 + 100)}`,
+    type: n.type,
     title: n.title,
     content: n.message,
     published_at: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
@@ -86,6 +111,7 @@ export function pushNotification(n: Omit<AppNotification, 'id' | 'createdAt' | '
   };
   const next = [item, ...list.map((notification) => ({
     id: `NTF-${Date.now().toString(36)}-${Math.floor(Math.random() * 900 + 100)}`,
+    type: notification.type,
     title: notification.title,
     content: notification.message,
     published_at: new Date(notification.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),

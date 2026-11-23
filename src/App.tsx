@@ -762,6 +762,12 @@ function SchoolApp() {
     };
     const updatedLedger = [linkedTx, ...ledger];
     setLedger(updatedLedger);
+
+    pushNotification({
+      type: 'payment',
+      title: 'Fee payment received',
+      message: `${paymentData.studentName} (${paymentData.class}) paid ৳${paymentData.amountPaid.toLocaleString()} (${paymentData.month})`,
+    });
   };
 
   // ----------------------------------------------------
@@ -920,6 +926,11 @@ function SchoolApp() {
     const next = [...staffAccounts, account];
     setStaffAccounts(next);
     dbSet('samdani_staff_accounts', next);
+    pushNotification({
+      type: 'teacher',
+      title: 'New staff account pending approval',
+      message: `${account.fullName} (${account.role}) submitted a staff portal registration`,
+    });
   };
 
   const handleStaffLogin = (session: StaffPortalSession) => {
@@ -1006,6 +1017,11 @@ function SchoolApp() {
     };
     setTeachersStaff((previous) => [...previous, rosterEntry]);
     setStaffAccounts((previous) => previous.map((item) => item.id === account.id ? { ...item, status: 'approved' } : item));
+    pushNotification({
+      type: 'teacher',
+      title: 'Staff account approved',
+      message: `${account.fullName} was added to the staff salary roster`,
+    });
     alert(`${account.fullName} has been linked to the staff salary roster.`);
   };
 
@@ -1018,6 +1034,11 @@ function SchoolApp() {
     setStaffAccounts((previous) => previous.map((item) =>
       item.id === accountId ? { ...item, status: 'approved' } : item
     ));
+    pushNotification({
+      type: 'teacher',
+      title: 'Staff account approved',
+      message: `${account.fullName} was approved for the staff portal`,
+    });
   };
 
   // Reject a pending teacher account (with a reason shown on their portal)
