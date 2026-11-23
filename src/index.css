@@ -313,7 +313,7 @@ body {
   
   @page { size: A4 portrait; margin: 10mm 12mm; }
 
-  /* The wrapper that holds exactly 8 students */
+  /* The wrapper that holds exactly 6 students */
   .a4-page-wrapper {
     height: 276mm;
     box-sizing: border-box;
@@ -322,26 +322,32 @@ body {
     gap: 2mm;
     break-inside: avoid;
     page-break-inside: avoid;
-    page-break-after: always; /* Force a new page after every 8 slips */
+    page-break-after: always; /* Force a new page after every 6 slips */
   }
 
   .a4-page-wrapper:last-child {
     page-break-after: auto;
   }
 
-  /* The individual Student Slip (exactly 1/8th of the page) */
+  /* The individual Student Slip (exactly 1/6th of the page) */
   .due-slip {
-    height: calc((276mm - 14mm) / 8);
-    flex: 0 0 calc((276mm - 14mm) / 8);
+    height: calc((276mm - 14mm) / 6);
+    flex: 0 0 calc((276mm - 14mm) / 6);
     border: 2px solid #000;
     box-sizing: border-box;
     padding: 3px 6px;
+    font-size: 12px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     overflow: hidden;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .due-slip,
+  .due-slip * {
+    font-size: 12px !important;
   }
 
   /* Inner Grid Thin Borders */
@@ -352,7 +358,7 @@ body {
   }
   .due-slip-table td, .due-slip-table th {
     border: 1px solid #000;
-    font-size: 10px;
+    font-size: 12px;
     padding: 1px 3px;
   }
 

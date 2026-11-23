@@ -19,6 +19,7 @@ export interface LedgerTransaction {
   amount: number;
   description: string;
   recordedBy: string;
+  className?: string;
 }
 
 export type FeeDigitInputs = Partial<Record<

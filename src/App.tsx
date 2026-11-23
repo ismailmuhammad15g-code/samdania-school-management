@@ -758,6 +758,7 @@ function SchoolApp() {
       amount: paymentData.amountPaid,
       description: `Fees collected: ${paymentData.studentName} (${paymentData.class} - ${paymentData.month})`,
       recordedBy: adminName,
+      className: paymentData.class,
     };
     const updatedLedger = [linkedTx, ...ledger];
     setLedger(updatedLedger);

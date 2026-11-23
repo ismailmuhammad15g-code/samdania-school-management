@@ -1311,7 +1311,7 @@ export default function FeesModule({
                   ) : (
                     payments.map((p) => (
                       <tr key={p.id} className="hover:bg-[#f5f2ed]/50 transition-all">
-                        <td className="py-3 px-4 font-mono font-bold text-[#4a5d4e]">{p.receiptNo}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-[#4a5d4e]">{p.invoiceNo}</td>
                         <td className="py-3 px-4 font-mono text-stone-500 whitespace-nowrap">{p.date}</td>
                         <td className="py-3 px-4 font-bold text-[#2c332d]">
                           {p.studentName} <span className="text-[10px] text-stone-400 font-mono">({p.studentId})</span>
@@ -2020,23 +2020,23 @@ export default function FeesModule({
     )}
     {typeof document !== 'undefined' && createPortal(
       <div id="print-slips-container" aria-hidden="true">
-        {Array.from({ length: Math.ceil(printableSlips.length / 8) }, (_, pageIndex) => (
+        {Array.from({ length: Math.ceil(printableSlips.length / 6) }, (_, pageIndex) => (
           <div className="a4-page-wrapper" key={`slip-page-${pageIndex}`}>
-            {printableSlips.slice(pageIndex * 8, pageIndex * 8 + 8).map((student) => {
+            {printableSlips.slice(pageIndex * 6, pageIndex * 6 + 6).map((student) => {
               const finalTotalDue = getSlipTotalDue(student);
               return (
                 <div className="due-slip" key={student.id}>
                   <div style={{ textAlign: 'center', lineHeight: 1.4, marginBottom: 2 }}>
-                    <p style={{ color: '#006400', fontWeight: 'bold', fontSize: 11, margin: 0 }}>
+                    <p style={{ color: '#006400', fontWeight: 'bold', fontSize: 12, margin: 0 }}>
                       الْمَدْرَسَةُ الصَّمَدَانِيَّةُ لِلتَّعْلِيمِ الْإِسْلَامِيِّ بِغَلَا جِيبَة
                     </p>
-                    <h2 style={{ color: '#006400', fontWeight: 'bold', fontSize: 15, margin: '1px 0' }}>
+                    <h2 style={{ color: '#006400', fontWeight: 'bold', fontSize: 12, margin: '1px 0' }}>
                       সামদানীয়া তা'লীমুল ইসলাম মাদ্রাসা, গলাচিপা
                     </h2>
-                    <p style={{ color: '#0000CD', fontSize: 9, margin: '1px 0' }}>
+                    <p style={{ color: '#0000CD', fontSize: 12, margin: '1px 0' }}>
                       নূরানী ও ইবতেদায়ী বিভাগ (আবাসিক-অনাবাসিক) হিফজ বিভাগ (আবাসিক) নাজেরা বিভাগ (আবাসিক)
                     </p>
-                    <p style={{ color: '#000', fontSize: 8, margin: 0 }}>
+                    <p style={{ color: '#000', fontSize: 12, margin: 0 }}>
                       (পীর বদরুল ইসলাম সামদানী কমপ্লেক্স) খানকায়ে ফুরফুরা শরীফ, দারুল আমান, ০২নং ওয়ার্ড, গলাচিপা, পটুয়াখালী। স্থাপিতঃ ২০০৬ খ্রিঃ।
                     </p>
                   </div>
@@ -2064,10 +2064,10 @@ export default function FeesModule({
                     </tbody>
                   </table>
                   <div className="due-slip-footer-block">
-                    <p style={{ fontSize: 9, lineHeight: 1.15, margin: '2px 0' }}>
+                    <p style={{ fontSize: 12, lineHeight: 1.15, margin: '2px 0' }}>
                       আগামি {deadlineDate} ইং তারিখের মধ্যে আপনার বকেয়া {finalTotalDue.toLocaleString('bn-BD')} টাকা পরিশোধ করুন।
                     </p>
-                    <div style={{ textAlign: 'right', paddingRight: 20, fontSize: 9, lineHeight: 1.1 }}>
+                    <div style={{ textAlign: 'right', paddingRight: 20, fontSize: 12, lineHeight: 1.1 }}>
                       অধ্যক্ষ
                     </div>
                   </div>

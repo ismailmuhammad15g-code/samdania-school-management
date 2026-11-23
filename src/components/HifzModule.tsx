@@ -1005,7 +1005,7 @@ export default function HifzModule({
                   ) : (
                     payments.map((p) => (
                       <tr key={p.id} className="hover:bg-[#f5f2ed]/50 transition-all">
-                        <td className="py-3 px-4 font-mono font-bold text-[#4a5d4e]">{p.receiptNo}</td>
+                        <td className="py-3 px-4 font-mono font-bold text-[#4a5d4e]">{p.invoiceNo}</td>
                         <td className="py-3 px-4 font-mono text-stone-500 whitespace-nowrap">{p.date}</td>
                         <td className="py-3 px-4 font-bold text-[#2c332d]">
                           {p.studentName} <span className="text-[10px] text-stone-400 font-mono">({p.studentId})</span>

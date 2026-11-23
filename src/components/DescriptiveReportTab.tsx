@@ -17,6 +17,27 @@ const dayBn = (date: string) => new Date(`${date}T00:00:00`).toLocaleDateString(
 const money = (value: number) => `৳ ${toBengaliDigits(Math.round(value))}`;
 const words = (value: number) => `${numberToBengaliWords(Math.round(value))} মাত্র`;
 
+const normalizeClassName = (value: string): string =>
+  value
+    .replace(/দ্বিতীয়/g, 'দ্বিতীয়')
+    .replace(/তৃতীয়/g, 'তৃতীয়')
+    .replace(/চতুর্থ/g, 'চতুর্থ')
+    .replace(/পঞ্চম/g, 'পঞ্চম')
+    .replace(/প্রথম/g, 'প্রথম')
+    .replace(/শিশু/g, 'শিশু')
+    .trim();
+
+const getIncomeClass = (entry: LedgerTransaction): string | null => {
+  if (entry.className) {
+    const normalized = normalizeClassName(entry.className);
+    const configuredClass = CLASS_OPTIONS.find((item) => normalizeClassName(item) === normalized);
+    if (configuredClass) return configuredClass;
+  }
+
+  const text = `${entry.description || ''} ${entry.category || ''}`;
+  return CLASS_OPTIONS.find((item) => normalizeClassName(text).includes(normalizeClassName(item))) || null;
+};
+
 export default function DescriptiveReportTab({ ledger }: Props) {
   const [type, setType] = useState<ReportType>('monthly');
   const [classFilter, setClassFilter] = useState('all');
@@ -34,7 +55,9 @@ export default function DescriptiveReportTab({ ledger }: Props) {
 
   const rows = useMemo(() => ledger.filter((entry) => {
     const inRange = entry.date >= range.start && entry.date <= range.end;
-    const matchesFilter = classFilter === 'all' || entry.category === classFilter || entry.fund === classFilter;
+    const matchesFilter =
+      classFilter === 'all'
+      || (CLASS_OPTIONS.includes(classFilter) ? getIncomeClass(entry) === classFilter : entry.category === classFilter || entry.fund === classFilter);
     return inRange && matchesFilter;
   }), [ledger, range, classFilter]);
   const incomes = rows.filter((entry) => entry.type === 'Income');
@@ -44,7 +67,13 @@ export default function DescriptiveReportTab({ ledger }: Props) {
   const balance = totalIncome - totalExpense;
   const incomeSectors = Object.entries(incomes.reduce<Record<string, number>>((out, entry) => { out[entry.category] = (out[entry.category] || 0) + entry.amount; return out; }, {}));
   const expenseSectors = Object.entries(expenses.reduce<Record<string, number>>((out, entry) => { out[entry.category] = (out[entry.category] || 0) + entry.amount; return out; }, {}));
-  const classBreakdown = Object.entries(incomes.reduce<Record<string, { count: number; amount: number }>>((out, entry) => { const key = entry.category || 'অন্যান্য'; out[key] = out[key] || { count: 0, amount: 0 }; out[key].count += 1; out[key].amount += entry.amount; return out; }, Object.fromEntries(REPORT_CLASSES.map((key) => [key, { count: 0, amount: 0 }]))));
+  const classBreakdown = Object.entries(incomes.reduce<Record<string, { count: number; amount: number }>>((out, entry) => {
+    const key = getIncomeClass(entry) || entry.category || 'অন্যান্য';
+    out[key] = out[key] || { count: 0, amount: 0 };
+    out[key].count += 1;
+    out[key].amount += entry.amount;
+    return out;
+  }, Object.fromEntries(REPORT_CLASSES.map((key) => [key, { count: 0, amount: 0 }]))));
   const classNarrative = classBreakdown.map(([key, value]) => <><strong>{key}</strong> শ্রেণীতে মোট {toBengaliDigits(value.count)} টি রসিদ মারফত {money(value.amount)}; </>);
 
   const generate = () => setGenerated(true);
@@ -103,7 +132,9 @@ export default function DescriptiveReportTab({ ledger }: Props) {
 }
 
 function ClassSpecificReport({ target, rows, periodTitle }: { target: string; rows: LedgerTransaction[]; periodTitle: string }) {
-  const incomes = rows.filter((entry) => entry.type === 'Income');
+  const incomes = rows.filter((entry) => entry.type === 'Income' && (
+    CLASS_OPTIONS.includes(target) ? getIncomeClass(entry) === target : entry.category === target || entry.fund === target
+  ));
   const total = incomes.reduce((sum, entry) => sum + entry.amount, 0);
   const sectors = Object.entries(incomes.reduce<Record<string, { count: number; amount: number }>>((out, entry) => { const key = entry.category || 'অন্যান্য'; out[key] = out[key] || { count: 0, amount: 0 }; out[key].count += 1; out[key].amount += entry.amount; return out; }, {}));
   const average = incomes.length ? total / incomes.length : 0;
