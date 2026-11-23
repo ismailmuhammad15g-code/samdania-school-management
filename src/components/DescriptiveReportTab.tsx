@@ -17,15 +17,32 @@ const dayBn = (date: string) => new Date(`${date}T00:00:00`).toLocaleDateString(
 const money = (value: number) => `৳ ${toBengaliDigits(Math.round(value))}`;
 const words = (value: number) => `${numberToBengaliWords(Math.round(value))} মাত্র`;
 
-const normalizeClassName = (value: string): string =>
-  value
-    .replace(/দ্বিতীয়/g, 'দ্বিতীয়')
-    .replace(/তৃতীয়/g, 'তৃতীয়')
-    .replace(/চতুর্থ/g, 'চতুর্থ')
-    .replace(/পঞ্চম/g, 'পঞ্চম')
-    .replace(/প্রথম/g, 'প্রথম')
-    .replace(/শিশু/g, 'শিশু')
-    .trim();
+const normalizeClassName = (value: string): string => {
+  const raw = String(value || '').normalize('NFC').trim();
+  const rawLower = raw.toLowerCase();
+  const compact = raw
+    .replace(/[.\s-০-৯0-9]/g, '')
+    .toLowerCase();
+
+  if (/^(১ম|প্রথম|first|class\s*1|class\s*one|ক্লাস\s*1|ক্লাস\s*১)$/i.test(rawLower)) return 'প্রথম';
+  if (/^(২য়|২য়|দ্বিতীয়|দ্বিতীয়|second|class\s*2|class\s*two|ক্লাস\s*2|ক্লাস\s*২)$/i.test(rawLower)) return 'দ্বিতীয়';
+  if (/^(৩য়|৩য়|তৃতীয়|তৃতীয়|third|class\s*3|class\s*three|ক্লাস\s*3|ক্লাস\s*৩)$/i.test(rawLower)) return 'তৃতীয়';
+  if (/^(৪র্থ|চতুর্থ|fourth|class\s*4|class\s*four|ক্লাস\s*4|ক্লাস\s*৪)$/i.test(rawLower)) return 'চতুর্থ';
+  if (/^(৫ম|পঞ্চম|fifth|class\s*5|class\s*five|ক্লাস\s*5|ক্লাস\s*৫)$/i.test(rawLower)) return 'পঞ্চম';
+  if (/^(play|শিশু|nursery|prk|kg)$/i.test(compact)) return 'শিশু';
+  if (/^(১ম|১য়|১য়|ম|প্রথম|first|one|classone|ক্লাসone)$/i.test(compact)) return 'প্রথম';
+  if (/^(২য়|২য়|য়|দ্বিতীয়|দ্বিতীয়|second|two|classtwo|ক্লাসtwo)$/i.test(compact)) return 'দ্বিতীয়';
+  if (/^(৩য়|৩য়|তৃতীয়|তৃতীয়|third|three|classthree|ক্লাসthree)$/i.test(compact)) return 'তৃতীয়';
+  if (/^(৪র্থ|চতুর্থ|fourth|four|classfour|ক্লাসfour)$/i.test(compact)) return 'চতুর্থ';
+  if (/^(৫ম|পঞ্চম|fifth|five|classfive|ক্লাসfive)$/i.test(compact)) return 'পঞ্চম';
+  if (/^(first|১ম|প্রথম|class1|classone|ক্লাস1|ক্লাস১)$/i.test(compact)) return 'প্রথম';
+  if (/^(second|২য়|দ্বিতীয়|দ্বিতীয়|class2|classtwo|ক্লাস2|ক্লাস২)$/i.test(compact)) return 'দ্বিতীয়';
+  if (/^(third|৩য়|তৃতীয়|তৃতীয়|class3|classthree|ক্লাস3|ক্লাস৩)$/i.test(compact)) return 'তৃতীয়';
+  if (/^(fourth|৪র্থ|চতুর্থ|class4|classfour|ক্লাস4|ক্লাস৪)$/i.test(compact)) return 'চতুর্থ';
+  if (/^(fifth|৫ম|পঞ্চম|class5|classfive|ক্লাস5|ক্লাস৫)$/i.test(compact)) return 'পঞ্চম';
+
+  return raw.trim();
+};
 
 const getIncomeClass = (entry: LedgerTransaction): string | null => {
   if (entry.className) {
@@ -36,6 +53,29 @@ const getIncomeClass = (entry: LedgerTransaction): string | null => {
 
   const text = `${entry.description || ''} ${entry.category || ''}`;
   return CLASS_OPTIONS.find((item) => normalizeClassName(text).includes(normalizeClassName(item))) || null;
+};
+
+const getLedgerStudentName = (entry: LedgerTransaction): string => {
+  const match = /^Fees collected:\s*(.+?)\s*\(/.exec(entry.description || '');
+  return match ? match[1].trim() : '';
+};
+
+const getLedgerReceiptNo = (
+  entry: LedgerTransaction,
+  payments: FeePayment[],
+): string => {
+  const studentName = getLedgerStudentName(entry);
+  const matches = payments.filter((payment) =>
+    payment.date === entry.date
+    && payment.amountPaid === entry.amount
+    && (!studentName || payment.studentName === studentName)
+  );
+  if (matches.length === 1) return String(matches[0].invoiceNo);
+  if (studentName) {
+    const nameMatch = matches.find((payment) => payment.studentName === studentName);
+    if (nameMatch) return String(nameMatch.invoiceNo);
+  }
+  return String(entry.id).replace(/^TX-/i, '');
 };
 
 export default function DescriptiveReportTab({ ledger, payments }: Props) {
@@ -68,7 +108,7 @@ export default function DescriptiveReportTab({ ledger, payments }: Props) {
   const incomeSectors = Object.entries(incomes.reduce<Record<string, number>>((out, entry) => { out[entry.category] = (out[entry.category] || 0) + entry.amount; return out; }, {}));
   const expenseSectors = Object.entries(expenses.reduce<Record<string, number>>((out, entry) => { out[entry.category] = (out[entry.category] || 0) + entry.amount; return out; }, {}));
   const classBreakdown = Object.entries(payments
-    .filter((payment) => payment.date >= range.start && payment.date <= range.end)
+    .filter((payment) => String(payment.date || '').slice(0, 10) >= range.start && String(payment.date || '').slice(0, 10) <= range.end)
     .reduce<Record<string, { count: number; amount: number }>>((out, payment) => {
       const normalized = normalizeClassName(payment.class);
       const key = CLASS_OPTIONS.find((item) => normalizeClassName(item) === normalized)
@@ -129,7 +169,14 @@ export default function DescriptiveReportTab({ ledger, payments }: Props) {
         <div className="narrative-box"><h3>হিসাবের বর্ণনামূলক পর্যালোচনা</h3><p><strong>পরিপূর্ণ মাসিক/মেয়াদী হিসাব বিবরণী:</strong> পর্যালোচিত {range.title} মেয়াদে প্রতিষ্ঠানে ছাত্রছাত্রীদের বেতন, ফি ও বিবিধ খাত হতে সর্বমোট <b className="narrative-success">{money(totalIncome)}</b> আদায় হয়েছে। একই সময়কালে প্রাতিষ্ঠানিক প্রশাসনিক, স্টেশনারি ও পরিচালন ব্যয় হিসেবে মোট <b className="narrative-danger">{money(totalExpense)}</b> পরিশোধ করা হয়েছে। হিসাব সমাপনান্তে উক্ত সময়ের নিট উদ্বৃত্ত/স্থাবর ক্যাশ ব্যালেন্স নির্ধারিত হয়েছে <b className="narrative-highlight">{money(balance)}</b> (কথায়: <em>{words(balance)}</em>)।</p><p><strong>শ্রেণীভিত্তিক মোট আদায়:</strong> {classNarrative}</p></div>
         <ReportTable title="শ্রেণী/খাতভিত্তিক মোট আদায়" headers={['ক্র.নং', 'শ্রেণী/খাত', 'রসিদ সংখ্যা', 'মোট আদায়', 'শতাংশ']} rows={classBreakdown.map(([key, value], index) => [toBengaliDigits(index + 1), key, toBengaliDigits(value.count), money(value.amount), percent(value.amount)])} footer={['', 'মোট', toBengaliDigits(classPaymentCount), money(classPaymentAmount), classPaymentAmount ? '১০০%' : '০%']} />
         <div className="report-two-column"><ReportTable title="আয়ের খাত" headers={['খাত', 'টাকা']} rows={incomeSectors.map(([key, value]) => [key, money(value)])} /><ReportTable title="ব্যয়ের খাত" headers={['খাত', 'টাকা']} rows={expenseSectors.map(([key, value]) => [key, money(value)])} /></div>
-        <ReportTable title="বিস্তারিত আয় লেনদেন" headers={['রসিদ নং', 'তারিখ', 'শ্রেণি/তহবিল', 'বিবরণ', 'খাত', 'টাকা']} rows={incomes.map((entry) => [entry.id, dateBn(entry.date), entry.fund, entry.description || '—', entry.category, money(entry.amount)])} />
+        <ReportTable title="বিস্তারিত আয় লেনদেন" headers={['রসিদ নং', 'তারিখ', 'শ্রেণি/তহবিল', 'বিবরণ', 'খাত', 'টাকা']} rows={incomes.map((entry) => [
+          getLedgerReceiptNo(entry, payments),
+          dateBn(entry.date),
+          entry.className ? normalizeClassName(entry.className) : entry.fund,
+          entry.description || '—',
+          entry.category,
+          money(entry.amount),
+        ])} />
         <ReportTable title="বিস্তারিত ব্যয় লেনদেন" headers={['ক্র.নং', 'তারিখ', 'ব্যয়ের খাত', 'মন্তব্য/বিবরণ', 'টাকা']} rows={expenses.map((entry, index) => [toBengaliDigits(index + 1), dateBn(entry.date), entry.category, entry.description || '—', money(entry.amount)])} />
         <div className="print-signatures"><div>প্রস্তুতকারীর স্বাক্ষর</div><div>হিসাবরক্ষকের স্বাক্ষর</div><div>অধ্যক্ষের স্বাক্ষর</div></div>
         </>}
